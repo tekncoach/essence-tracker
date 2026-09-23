@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Essence">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>if (navigator.standalone) document.documentElement.classList.add('standalone');</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
@@ -27,7 +28,12 @@
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
     font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     overflow: hidden; overscroll-behavior: none; }   /* an app screen: the page itself never scrolls or bounces */
-  #map { position: fixed; inset: 0; }
+  /* Installed on iOS under the translucent status bar, the viewport is the screen minus the top safe area (812 of
+     874 px on an iPhone 16 Pro), and position: fixed layers are cut at the viewport bottom. The page is stretched
+     to the whole screen, and the map, list and card are positioned against it (absolute), which does paint there. */
+  html.standalone { height: calc(100% + env(safe-area-inset-top)); }
+  body { position: relative; }
+  #map { position: absolute; inset: 0; }
 
   #top { position: absolute; z-index: 1000; top: env(safe-area-inset-top, 0); left: 0; right: 0;
     padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -120,7 +126,7 @@
     #q { font-size: 16px; }   /* below 16px, iOS zooms the page in on focus */
     #list { transition: transform .25s ease; }
     #list.away { transform: translateY(110%); }   /* hidden while a station card is open, height kept */
-    #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh;
+    #list { position: absolute; z-index: 999; left: 0; right: 0; bottom: 0; width: auto; height: 45vh;
       max-height: none; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3); }
     .list-head { grid-template-columns: auto 1fr; touch-action: none; }
     .grab-wrap { display: block; }
@@ -155,7 +161,7 @@
   /* Station card: bottom sheet on mobile, map popup on desktop */
   /* Fixed to the screen, not the page: on iOS the page stops short of the screen bottom, and a closed card pushed
      just below the page stayed visible in that gap. Hidden once slid out. */
-  #sheet { position: fixed; z-index: 1100; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto;
+  #sheet { position: absolute; z-index: 1100; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto;
     background: var(--sheet); border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3);
     transform: translateY(calc(100% + 40px)); visibility: hidden; transition: transform .25s ease, visibility 0s .25s; }
   #sheet.open { transform: none; visibility: visible; transition: transform .25s ease; }
@@ -845,7 +851,7 @@ function drag(handles, { start, move, end }) {
 // Folded = handle + header, down to the bottom of the screen.
 const listPeek = () => listBox.querySelector('.grab-wrap').offsetHeight + listBox.querySelector('.list-head').offsetHeight
   + parseFloat(getComputedStyle(listBox).paddingBottom);
-const listSnaps = () => [listPeek(), innerHeight * .45, innerHeight - 70];
+const listSnaps = () => { const h = document.body.clientHeight; return [listPeek(), h * .45, h - 70]; };   // page height: the whole screen once stretched
 let listStartH;
 function setListHeight(h) {
   listBox.style.height = `${h}px`;
@@ -886,7 +892,8 @@ new MutationObserver(() => {
 }).observe(sheet, { childList: true });
 
 (async () => {
-  if (!desktop.matches) listBox.hidden = false;
+  // Mobile: the list sheet hangs off the page, not the top bar (below it, so the fuel panel opens over the list).
+  if (!desktop.matches) { document.body.appendChild(listBox); listBox.hidden = false; }
   if (!store.get('fuels')) { prefs.hidden = false; renderPrefs(); }
   // iOS never offers installation by itself: explain it once, in Safari, when not already installed.
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent), standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
