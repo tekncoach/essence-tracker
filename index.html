@@ -56,6 +56,26 @@
   .fuel-opt img { width: 28px; height: 28px; }
   .fuel-opt input { width: 18px; height: 18px; }
   .fuel-opt .up { border: 0; background: var(--line); color: var(--fg); border-radius: 6px; cursor: pointer; height: 24px; }
+  #list { pointer-events: auto; background: var(--sheet); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.25);
+    max-width: 380px; max-height: calc(100vh - 190px); display: flex; flex-direction: column; overflow: hidden; }
+  @media (max-width: 699px) { #list { max-width: none; max-height: 55vh; } }
+  .list-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .list-head b { flex: 1; }
+  .seg { display: flex; background: var(--line); border-radius: 8px; padding: 2px; }
+  .seg button { border: 0; background: none; color: var(--fg); font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px; cursor: pointer; }
+  .seg button.on { background: var(--sheet); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  #list-rows { overflow-y: auto; }
+  .row { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 8px 12px;
+    border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+  .row:hover { background: var(--line); }
+  .row img { width: 32px; height: 32px; object-fit: contain; }
+  .row .initials { font-size: 11px; font-weight: 700; }
+  .row .who { min-width: 0; }
+  .row .who b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .who small { color: var(--muted); font-size: 12px; }
+  .row .p { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .row .p b { display: block; font-size: 15px; color: var(--fg); }
+  .list-foot { padding: 6px 12px; font-size: 11px; color: var(--muted); }
   #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
   #install button { float: right; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
   .fuel-opt .rank { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
@@ -133,12 +153,20 @@
       <div id="results"></div>
     </div>
     <button class="btn" id="prefs-btn" aria-label="Mes carburants">⛽<span class="label"> Carburants</span></button>
+    <button class="btn" id="list-btn" aria-label="Liste">☰<span class="label"> Liste</span></button>
     <button class="btn" id="locate" aria-label="Autour de moi">📍<span class="label"> Autour de moi</span></button>
   </div>
   <div id="prefs" class="panel" hidden>
     <h3>Mes carburants</h3>
     <p>Cochez ceux qui vous intéressent. Le premier disponible fixe la taille du pin et s’affiche en premier.</p>
     <div id="fuel-list"></div>
+  </div>
+  <div id="list" hidden>
+    <div class="list-head"><b id="list-title">Stations</b>
+      <div class="seg"><button data-sort="price" class="on">Prix</button><button data-sort="dist">Distance</button></div>
+    </div>
+    <div id="list-rows"></div>
+    <div class="list-foot" id="list-foot"></div>
   </div>
   <div id="install" class="panel" hidden>
     <button aria-label="Fermer">✕</button>
@@ -499,7 +527,49 @@ function render() {
     cards.push(hint);
   }
   document.getElementById('favs').replaceChildren(...cards);
+  renderList();
 }
+// List of the stations in view: by price (grouped by the preferred fuel each one is ranked on) or by distance.
+let listSort = 'price';
+function renderList() {
+  const box = document.getElementById('list');
+  if (box.hidden) return;
+  const bounds = map.getBounds(), c = map.getCenter(), from = origin || [c.lat, c.lng];
+  const inView = stations.filter(s => bounds.contains(s.pos));
+  const ok = inView.filter(s => available(s).length && openState(s).open !== false);
+  const km = s => distKm(from, s.pos);
+  ok.sort(listSort === 'dist' ? (a, b) => km(a) - km(b) : (a, b) => {
+    const [fa, fb] = [available(a)[0], available(b)[0]];
+    return wanted.indexOf(fa) - wanted.indexOf(fb) || a.fuels[fa].price - b.fuels[fb].price;
+  });
+  document.getElementById('list-title').textContent = `${ok.length} stations dans la vue`;
+  document.getElementById('list-rows').replaceChildren(...ok.map(s => {
+    const b = document.createElement('button');
+    b.className = 'row';
+    const [first, second] = available(s);
+    b.innerHTML = `${logoHtml(s)}<span class="who"><b>${isFav(s.id) ? '⭐ ' : ''}${title(s.name) || s.brand || 'Station'}</b>
+      <small>${title(s.ville)} · ${km(s).toFixed(1).replace('.', ',')} km</small></span>
+      <span class="p"><b>${first} ${euro(s.fuels[first].price)}</b>${second ? `${second} ${euro(s.fuels[second].price)}` : ''}</span>`;
+    b.onclick = () => { if (!desktop.matches) box.hidden = true; showStation(s, Math.max(map.getZoom(), 15)); };
+    return b;
+  }));
+  const hiddenCount = inView.length - ok.length;
+  document.getElementById('list-foot').textContent =
+    `${hiddenCount ? `${hiddenCount} en rupture ou fermées non listées · ` : ''}distance depuis ${origin ? 'votre départ' : 'le centre de la carte'}`;
+}
+document.getElementById('list-btn').onclick = () => {
+  const box = document.getElementById('list');
+  box.hidden = !box.hidden;
+  prefs.hidden = true;
+  renderList();
+};
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+  listSort = b.dataset.sort;
+  document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b));
+  renderList();
+});
+map.on('moveend', renderList);
+
 
 function setOrigin(pos, save) {
   origin = pos;
