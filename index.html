@@ -26,7 +26,7 @@
   [hidden] { display: none !important; }   /* panels set their own display, which would override the attribute */
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
     font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  #map { position: absolute; inset: 0; }
+  #map { position: fixed; inset: 0; }   /* fixed: covers the whole screen, home-indicator area included */
 
   #top { position: absolute; z-index: 1000; top: env(safe-area-inset-top, 0); left: 0; right: 0;
     padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -123,6 +123,8 @@
     .list-head { grid-template-columns: auto 1fr; touch-action: none; }
     .grab-wrap { display: block; }
     #list.snapping { transition: height .25s ease; }
+    #list.peek { background: var(--head); }   /* folded: the area under the header matches it */
+    #list.peek > :not(.grab-wrap):not(.list-head) { visibility: hidden; }   /* would spill into the safe area */
     #sheet .sh-head { touch-action: none; }
   }
   #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
@@ -836,16 +838,24 @@ function drag(handles, { start, move, end }) {
 
 // List sheet: three heights (header only, half screen, almost full), picked by where the finger lets go,
 // pushed further by a flick.
-const listSnaps = () => [listBox.querySelector('.list-head').offsetHeight + 24, innerHeight * .45, innerHeight - 70];
+// Folded = handle + header + the home-indicator safe area (the list's bottom padding), so nothing is cut and the
+// header stays clear of the system swipe-up zone.
+const listPeek = () => listBox.querySelector('.grab-wrap').offsetHeight + listBox.querySelector('.list-head').offsetHeight
+  + parseFloat(getComputedStyle(listBox).paddingBottom);
+const listSnaps = () => [listPeek(), innerHeight * .45, innerHeight - 70];
 let listStartH;
+function setListHeight(h) {
+  listBox.style.height = `${h}px`;
+  listBox.classList.toggle('peek', h <= listPeek() + 1);
+}
 function snapList(h) {
   listBox.classList.add('snapping');
-  listBox.style.height = `${h}px`;
+  setListHeight(h);
   setTimeout(() => listBox.classList.remove('snapping'), 260);
 }
 drag([listBox.querySelector('.grab-wrap'), listBox.querySelector('.list-head')], {
   start() { listStartH = listBox.offsetHeight; },
-  move(dy) { const [lo, , hi] = listSnaps(); listBox.style.height = `${Math.min(hi, Math.max(lo, listStartH - dy))}px`; },
+  move(dy) { const [lo, , hi] = listSnaps(); setListHeight(Math.min(hi, Math.max(lo, listStartH - dy))); },
   end(dy, v) {
     const aim = listBox.offsetHeight - v * 250;
     snapList(listSnaps().reduce((a, b) => Math.abs(b - aim) < Math.abs(a - aim) ? b : a));
