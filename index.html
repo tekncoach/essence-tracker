@@ -812,9 +812,7 @@ async function startRoute(dest, label) {
     route = { label, start, dest, line, cum, km: r.distance / 1000, min: r.duration / 60, range, corridor };
     stations = [];   // those around the view have no position on the trip; the list redraws on every map move
     render();
-    routeLayer.clearLayers();
-    L.polyline(line, { color: '#f08a3c', weight: 5, opacity: .85 }).addTo(routeLayer);
-    L.circleMarker(dest, { radius: 7, color: '#fff', weight: 3, fillColor: '#f08a3c', fillOpacity: 1 }).addTo(routeLayer);
+    drawRoute();
     // Keep the road clear of the panels: list on the left on desktop, list sheet at the bottom on mobile.
     map.fitBounds(L.latLngBounds(line), desktop.matches ? { paddingTopLeft: [410, 110], paddingBottomRight: [30, 30] }
                                                         : { paddingTopLeft: [20, 120], paddingBottomRight: [20, innerHeight * .45] });
@@ -834,6 +832,33 @@ async function startRoute(dest, label) {
   } catch (e) {
     info.textContent = e.message;
   }
+}
+
+// Point `km` along the road, and the road split there.
+function alongRoute(km) {
+  const { line, cum } = route;
+  const i = Math.max(1, cum.findIndex(c => c >= km));
+  const t = (km - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+  const p = [line[i - 1][0] + t * (line[i][0] - line[i - 1][0]), line[i - 1][1] + t * (line[i][1] - line[i - 1][1])];
+  return { point: p, before: [...line.slice(0, i), p], after: [p, ...line.slice(i)] };
+}
+
+// Blue road on a white casing (readable over any map colour); beyond the range, grey and dashed, with a STOP sign
+// where the range runs out.
+function drawRoute() {
+  routeLayer.clearLayers();
+  const { line, range, km, dest } = route;
+  const cut = range && range < km ? alongRoute(range) : null;
+  const drive = cut ? cut.before : line;
+  L.polyline(drive, { color: '#fff', weight: 9, opacity: .9 }).addTo(routeLayer);
+  L.polyline(drive, { color: '#1a73e8', weight: 5 }).addTo(routeLayer);
+  if (cut) {
+    L.polyline(cut.after, { color: '#6e6e73', weight: 4, dashArray: '8 8', opacity: .8 }).addTo(routeLayer);
+    L.marker(cut.point, { zIndexOffset: 6000, icon: L.divIcon({ className: '', iconSize: [34, 34], html:
+      '<svg viewBox="0 0 34 34" width="34" height="34"><polygon points="10,1 24,1 33,10 33,24 24,33 10,33 1,24 1,10" fill="#d62b2b" stroke="#fff" stroke-width="2"/><text x="17" y="21" text-anchor="middle" font-size="9" font-weight="800" fill="#fff" font-family="-apple-system,sans-serif">STOP</text></svg>' }) })
+      .bindTooltip(`Autonomie épuisée : km ${range}`, { direction: 'top', offset: [0, -16] }).addTo(routeLayer);
+  }
+  L.circleMarker(dest, { radius: 7, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(routeLayer);
 }
 
 function clearRoute() {
@@ -951,7 +976,7 @@ function renderList() {
       <span class="who"><b>${isFav(s.id) ? '⭐ ' : ''}${title(s.name) || s.brand || 'Station'}</b>
       <small>${title(s.ville)}${route && s.pop === 'A' ? ' · autoroute' : ''}</small>
       <small>${route ? `km ${Math.round(s.along)} · à ${s.off.toFixed(1).replace('.', ',')} km de la route` : `${km(s).toFixed(1).replace('.', ',')} km`}</small>
-      ${s === last ? '<span class="badge">Dernière avant la réserve</span>' : ''}</span>
+      ${s === last ? '<span class="badge">Dernière atteignable</span>' : ''}</span>
       <span class="p">${route && !reachable(s) ? '<span class="na">Hors autonomie</span>' : !n ? '<span class="na">Indisponible</span>' : closed ? '<span class="na">Fermée</span>'
         : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}</span></button>`;
   }).join('');
