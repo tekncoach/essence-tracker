@@ -49,6 +49,13 @@
   #results small { color: var(--muted); margin-left: 6px; }
   #tools .btn { font-size: 14px; padding: 8px 10px; border-radius: 10px; white-space: nowrap; }
   @media (max-width: 699px) { #tools .btn .label { display: none; } }
+  .ico { width: 20px; height: 20px; vertical-align: -4px; }
+  /* Round white map buttons on mobile, in light and dark mode alike (as map controls usually are) */
+  @media (max-width: 699px) {
+    #tools #search-btn, #tools #locate { width: 44px; height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+      background: #fff; color: #1c1c1e; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    #tools .btn .ico { width: 22px; height: 22px; }
+  }
   .panel { pointer-events: auto; background: var(--sheet); border-radius: 12px; padding: 10px 12px; max-width: 320px;
     box-shadow: 0 4px 16px rgba(0,0,0,.25); }
   .panel h3 { margin: 0 0 2px; font-size: 15px; }
@@ -107,7 +114,7 @@
   @media (max-width: 699px) {
     #prefs-btn, #list-btn, #favs, #bar, #list-close { display: none !important; }
     #tools { justify-content: flex-end; }
-    #search-btn { display: block; }
+    #search-btn { display: grid; }
     #tools:not(.searching) .search { display: none; }   /* search folded behind a button: rarely needed on the go */
     #list { transition: transform .25s ease; }
     #list.away { transform: translateY(110%); }   /* hidden while a station card is open, height kept */
@@ -197,10 +204,10 @@
       <input id="q" type="search" placeholder="Ville, code postal ou adresse" autocomplete="off" enterkeyhint="search">
       <div id="results"></div>
     </div>
-    <button class="btn" id="search-btn" aria-label="Rechercher une ville ou une adresse">🔍</button>
+    <button class="btn" id="search-btn" aria-label="Rechercher une ville ou une adresse"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
     <button class="btn" id="prefs-btn" aria-label="Mes carburants">⛽<span class="label"> Carburants</span></button>
     <button class="btn" id="list-btn" aria-label="Liste">☰<span class="label"> Liste</span></button>
-    <button class="btn" id="locate" aria-label="Autour de moi">📍<span class="label"> Autour de moi</span></button>
+    <button class="btn" id="locate" aria-label="Autour de moi"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.6 3.4 3.5 10.6c-.8.3-.7 1.5.1 1.7l6.6 1.5 1.5 6.6c.2.8 1.4.9 1.7.1L20.6 3.4z"/></svg><span class="label"> Autour de moi</span></button>
   </div>
   <div id="prefs" class="panel" hidden>
     <div class="panel-head"><h3>Mes carburants</h3><button class="x" id="prefs-close" aria-label="Fermer">✕</button></div>
