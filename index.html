@@ -27,7 +27,8 @@
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
     font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     overflow: hidden; overscroll-behavior: none; }   /* an app screen: the page itself never scrolls or bounces */
-  #map { position: fixed; inset: 0; }   /* fixed: covers the whole screen, home-indicator area included */
+  /* --bottom-gap: see fitScreen(). Fixed layers are stretched by it so they reach the real bottom of the screen. */
+  #map { position: fixed; inset: 0 0 calc(-1 * var(--bottom-gap, 0px)) 0; }
 
   #top { position: absolute; z-index: 1000; top: env(safe-area-inset-top, 0); left: 0; right: 0;
     padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -120,13 +121,15 @@
     #q { font-size: 16px; }   /* below 16px, iOS zooms the page in on focus */
     #list { transition: transform .25s ease; }
     #list.away { transform: translateY(110%); }   /* hidden while a station card is open, height kept */
-    #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh; max-height: none;
-      border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3); padding-bottom: env(safe-area-inset-bottom, 0); }
+    #list { position: fixed; left: 0; right: 0; bottom: calc(-1 * var(--bottom-gap, 0px)); width: auto; height: 45vh;
+      max-height: none; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3); }
+    .list-foot { padding-bottom: 24px; }   /* last line clear of the home indicator bar */
     .list-head { grid-template-columns: auto 1fr; touch-action: none; }
     .grab-wrap { display: block; }
     #list.snapping { transition: height .25s ease; }
     #list.peek { background: var(--head); }   /* folded: the area under the header matches it */
     #list.peek > :not(.grab-wrap):not(.list-head) { visibility: hidden; }   /* would spill into the safe area */
+    #list.peek { padding-bottom: 16px; }   /* folded: buttons just above the home indicator bar, not on it */
     #list.peek .list-head { padding-bottom: 6px; }
     /* Whatever the page does not cover at the bottom (safe area, browser bar area) blends with the sheet header */
     html, body { background: var(--head); }
@@ -159,10 +162,10 @@
   /* Station card: bottom sheet on mobile, map popup on desktop */
   /* Fixed to the screen, not the page: on iOS the page stops short of the screen bottom, and a closed card pushed
      just below the page stayed visible in that gap. Hidden once slid out. */
-  #sheet { position: fixed; z-index: 1100; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto;
+  #sheet { position: fixed; z-index: 1100; left: 0; right: 0; bottom: calc(-1 * var(--bottom-gap, 0px)); max-height: 78%; overflow-y: auto;
     background: var(--sheet); border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3);
     transform: translateY(calc(100% + 40px)); visibility: hidden; transition: transform .25s ease, visibility 0s .25s;
-    padding-bottom: env(safe-area-inset-bottom, 0); }
+    padding-bottom: 16px; }
   #sheet.open { transform: none; visibility: visible; transition: transform .25s ease; }
   .st-pop .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-radius: 16px; background: var(--sheet); color: var(--fg); }
   .st-pop .leaflet-popup-content { margin: 0; width: 360px !important; max-height: calc(100vh - 200px); overflow-y: auto; font: inherit; }
@@ -812,6 +815,20 @@ document.getElementById('search-btn').onclick = () => {
 };
 q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key === 'Escape') results.replaceChildren(); };
 
+// Installed on iOS with the translucent status bar, the app may be given a viewport shorter than the screen (by
+// about the status bar height), leaving an unused strip at the bottom. Measure it and stretch the fixed layers.
+let bottomGap = 0;
+function fitScreen() {
+  const screenH = innerHeight > innerWidth ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const gap = navigator.standalone ? Math.max(0, Math.round(screenH - innerHeight)) : 0;
+  if (gap === bottomGap) return;
+  bottomGap = gap;
+  document.documentElement.style.setProperty('--bottom-gap', `${gap}px`);
+  map.invalidateSize();
+}
+fitScreen();
+addEventListener('resize', fitScreen);
+
 // Mobile gestures. drag() reports the vertical move of a finger that started on one of the handles; a move of
 // less than 8 px stays a tap, so the buttons inside the handles keep working.
 function drag(handles, { start, move, end }) {
@@ -851,7 +868,7 @@ function drag(handles, { start, move, end }) {
 // header stays clear of the system swipe-up zone.
 const listPeek = () => listBox.querySelector('.grab-wrap').offsetHeight + listBox.querySelector('.list-head').offsetHeight
   + parseFloat(getComputedStyle(listBox).paddingBottom);
-const listSnaps = () => [listPeek(), innerHeight * .45, innerHeight - 70];
+const listSnaps = () => [listPeek(), innerHeight * .45, innerHeight + bottomGap - 70];
 let listStartH;
 function setListHeight(h) {
   listBox.style.height = `${h}px`;
