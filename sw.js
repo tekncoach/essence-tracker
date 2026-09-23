@@ -19,7 +19,7 @@ self.addEventListener('fetch', e => {
 // Fuel return alerts (sent by worker/): show the notification; a tap opens the app on the station.
 self.addEventListener('push', e => {
   const d = e.data ? e.data.json() : {};
-  e.waitUntil(self.registration.showNotification(d.title || 'Essence', {
+  e.waitUntil(self.registration.showNotification(d.title || 'Le Bon Plein', {
     body: d.body || '', icon: 'icons/icon-192.png', data: { url: d.url || './' },
   }));
 });

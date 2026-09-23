@@ -1,6 +1,6 @@
 {
-  "name": "Essence — prix des carburants",
-  "short_name": "Essence",
+  "name": "Le Bon Plein — prix des carburants",
+  "short_name": "Le Bon Plein",
   "description": "Carte des prix et des ruptures de carburant, stations et carburants favoris.",
   "lang": "fr",
   "start_url": "./",
