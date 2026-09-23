@@ -212,7 +212,8 @@
     font-weight: 600; padding: 5px 12px 5px 5px; border-radius: 18px; white-space: nowrap; }
   .go img { width: 24px; height: 24px; border-radius: 6px; }
   .go .ico { width: 20px; height: 20px; margin-left: 4px; }
-  button.go { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+  button.go { border: 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .go-main { padding: 7px 18px; }
   .go.alt { background: rgba(255,255,255,.14); }
   /* Address and pin: long press (right click on desktop) opens the copy menu instead of the system callout */
   .sh-head .addr { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: context-menu; }
@@ -220,6 +221,18 @@
   #copy-menu button { display: block; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg);
     font: inherit; font-size: 15px; text-align: left; padding: 12px 16px; cursor: pointer; }
   #copy-menu button:last-child { border-bottom: 0; }
+  #nav-backdrop { position: fixed; inset: 0; z-index: 2999; background: rgba(0,0,0,.35); }
+  #nav-menu { position: fixed; z-index: 3000; background: var(--sheet); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    overflow: hidden; min-width: 250px; }
+  @media (max-width: 699px) {
+    #nav-menu { left: 8px; right: 8px; bottom: 8px; top: auto !important; padding-bottom: env(safe-area-inset-bottom, 0); }
+  }
+  .nm { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none;
+    color: var(--fg) !important; font: inherit; font-size: 16px; text-align: left; text-decoration: none; padding: 11px 16px; cursor: pointer; }
+  .nm:hover { background: var(--line); }
+  .nm img { width: 30px; height: 30px; border-radius: 7px; }
+  .nm .ico { width: 30px; height: 22px; color: var(--muted); }
+  .nm.cancel { justify-content: center; font-weight: 600; color: #2d7cf6 !important; border-bottom: 0; }
   #toast { position: fixed; z-index: 3001; left: 50%; bottom: 40%; transform: translateX(-50%); background: rgba(20,20,24,.9); color: #fff;
     padding: 8px 14px; border-radius: 10px; font-size: 14px; pointer-events: none; }
   .sh-body { padding: 4px 16px 16px; }
@@ -308,6 +321,8 @@
   <div id="bar"><div id="status">Chargement…</div></div>
 </div>
 <div id="sheet"></div>
+<div id="nav-backdrop" hidden></div>
+<div id="nav-menu" hidden></div>
 <div id="copy-menu" hidden><button data-copy="addr">Copier l’adresse</button><button data-copy="gps">Copier les coordonnées GPS</button></div>
 <div id="toast" hidden></div>
 
@@ -559,9 +574,7 @@ function cardHtml(s) {
         <button class="sh-close" aria-label="Fermer">✕</button>
         <button class="sh-fav ${isFav(s.id) ? 'on' : ''}" aria-label="Favori">${isFav(s.id) ? '★' : '☆'}</button>
       </div>
-      <div class="nav">${navLinks(s).map(([label, url, icon], i) =>
-        `<a class="go${i ? ' alt' : ''}" href="${url}" target="_blank">${icon === 'geo' ? PIN_ICON : `<img src="icons/nav/${icon}.png" alt="">`}${label}</a>`).join('')}
-        ${navigator.share ? `<button class="go alt share">${SHARE_ICON}Partager</button>` : ''}</div>
+      <div class="nav"><button class="go go-main">Y aller ›</button></div>
     </div>
     <div class="sh-body">
       <div class="sec">Carburants au ${today}</div>
@@ -611,14 +624,56 @@ async function copyText(text) {
   document.body.appendChild(ta); ta.select();
   const ok = document.execCommand('copy'); ta.remove(); return ok;
 }
-copyMenu.onclick = async e => {
-  const kind = e.target.dataset.copy, s = copyTarget;
-  copyMenu.hidden = true;
-  if (!kind || !s) return;
+async function copyStation(s, kind) {
   const text = kind === 'gps' ? `${s.pos[0].toFixed(6)}, ${s.pos[1].toFixed(6)}` : `${title(s.adresse)}, ${s.cp} ${title(s.ville)}`;
   toast(await copyText(text) ? (kind === 'gps' ? 'Coordonnées copiées' : 'Adresse copiée') : 'Copie impossible');
+}
+copyMenu.onclick = e => {
+  const kind = e.target.dataset.copy, s = copyTarget;
+  copyMenu.hidden = true;
+  if (kind && s) copyStation(s, kind);
 };
-addEventListener('pointerdown', e => { if (!copyMenu.hidden && !copyMenu.contains(e.target)) copyMenu.hidden = true; }, true);
+
+// "Y aller" menu: navigation apps, native share sheet, copies. A sheet rising from the bottom on mobile (like the
+// system action sheets), a dropdown under the button on desktop.
+const navMenu = document.getElementById('nav-menu'), navBackdrop = document.getElementById('nav-backdrop');
+const COPY_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+let navTarget = null;
+function openNavMenu(s, anchor) {
+  navTarget = s;
+  navMenu.innerHTML = navLinks(s).map(([label, url, icon]) =>
+      `<a class="nm" href="${url}" target="_blank">${icon === 'geo' ? PIN_ICON : `<img src="icons/nav/${icon}.png" alt="">`}<span>${label}</span></a>`).join('')
+    + (navigator.share ? `<button class="nm" data-act="share">${SHARE_ICON}<span>Partager…</span></button>` : '')
+    + `<button class="nm" data-act="addr">${COPY_ICON}<span>Copier l’adresse</span></button>`
+    + `<button class="nm" data-act="gps">${COPY_ICON}<span>Copier les coordonnées GPS</span></button>`
+    + (desktop.matches ? '' : '<button class="nm cancel" data-act="cancel">Annuler</button>');
+  navMenu.hidden = false;
+  if (desktop.matches) {
+    const r = anchor.getBoundingClientRect();
+    navMenu.style.left = `${Math.min(r.right - navMenu.offsetWidth, innerWidth - navMenu.offsetWidth - 8)}px`;
+    navMenu.style.top = `${Math.min(r.bottom + 6, innerHeight - navMenu.offsetHeight - 8)}px`;
+  } else {
+    navBackdrop.hidden = false;
+  }
+}
+function closeNavMenu() { navMenu.hidden = true; navBackdrop.hidden = true; }
+navMenu.onclick = e => {
+  const item = e.target.closest('.nm'), s = navTarget;
+  if (!item || !s) return;
+  closeNavMenu();
+  const act = item.dataset.act;
+  if (act === 'share') navigator.share({
+    title: title(s.name) || s.brand || 'Station',
+    text: `${title(s.name) || s.brand || 'Station'}\n${title(s.adresse)}, ${s.cp} ${title(s.ville)}\n${s.pos[0].toFixed(6)}, ${s.pos[1].toFixed(6)}`,
+    url: `https://maps.apple.com/?daddr=${s.pos[0]},${s.pos[1]}`,
+  }).catch(() => {});
+  if (act === 'addr' || act === 'gps') copyStation(s, act);
+};
+navBackdrop.onclick = closeNavMenu;
+addEventListener('pointerdown', e => {
+  if (!copyMenu.hidden && !copyMenu.contains(e.target)) copyMenu.hidden = true;
+  if (desktop.matches && !navMenu.hidden && !navMenu.contains(e.target) && !e.target.closest('.go-main')) closeNavMenu();
+}, true);
 
 const sheet = document.getElementById('sheet');
 let current = null;   // station whose card is open
@@ -661,13 +716,7 @@ map.on('popupclose', e => { if (e.popup === cardPopup) { cardPopup = null; curre
 function wireCard(root, s) {
   root.querySelector('.sh-close').onclick = closeCard;
   longPress(root.querySelector('.addr'), (x, y) => openCopyMenu(s, x, y));
-  // Native share sheet (iPhone included): name, address, coordinates and a map link, to send to any app.
-  const share = root.querySelector('.share');
-  if (share) share.onclick = () => navigator.share({
-    title: title(s.name) || s.brand || 'Station',
-    text: `${title(s.name) || s.brand || 'Station'}\n${title(s.adresse)}, ${s.cp} ${title(s.ville)}\n${s.pos[0].toFixed(6)}, ${s.pos[1].toFixed(6)}`,
-    url: `https://maps.apple.com/?daddr=${s.pos[0]},${s.pos[1]}`,
-  }).catch(() => {});
+  root.querySelector('.go-main').onclick = e => openNavMenu(s, e.currentTarget);
   root.querySelectorAll('.alert-btn').forEach(b => b.onclick = () => toggleAlert(s, b.dataset.fuel, b));
   const btn = root.querySelector('.sh-fav');
   btn.onclick = () => {
