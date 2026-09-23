@@ -33,7 +33,7 @@
      to the whole screen, and the map, list and card are positioned against it (absolute), which does paint there. */
   html.standalone { height: calc(100% + env(safe-area-inset-top)); }
   body { position: relative; }
-  #map { position: absolute; inset: 0; }
+  #map { position: absolute; inset: 0; z-index: 0; }   /* own layer: Leaflet's controls stay under the panels */
 
   #top { position: absolute; z-index: 1000; top: env(safe-area-inset-top, 0); left: 0; right: 0;
     padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -684,7 +684,7 @@ function renderList() {
   const rowsBox = document.getElementById('list-rows');
   if (rowsBox.dataset.html !== html) { rowsBox.innerHTML = html; rowsBox.dataset.html = html; }
   document.getElementById('list-foot').textContent =
-    `${statusText} · distance depuis ${origin ? 'votre départ' : 'le centre de la carte'}`;
+    `${statusText} · distance depuis ${origin ? 'votre départ' : 'le centre de la carte'} · carte © OpenStreetMap`;
 }
 document.getElementById('list-btn').onclick = () => {
   listBox.hidden = !listBox.hidden;
