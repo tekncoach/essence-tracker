@@ -187,8 +187,18 @@
   .sh-fav { width: 32px; height: 32px; border-radius: 50%; border: 0; background: #fff; color: #888; font-size: 18px; cursor: pointer; }
   .sh-fav.on { color: #f5b301; }
   .sh-close { width: 32px; height: 32px; border-radius: 50%; border: 0; background: #fff; color: #000; font-size: 18px; cursor: pointer; }
-  .go { grid-column: 2 / 4; justify-self: end; background: var(--accent); color: #fff !important; text-decoration: none;
-    font-weight: 600; padding: 7px 16px; border-radius: 18px; }
+  .nav { grid-column: 1 / 4; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .go { background: var(--accent); color: #fff !important; text-decoration: none; font-weight: 600; padding: 7px 16px;
+    border-radius: 18px; white-space: nowrap; }
+  .go.alt { background: rgba(255,255,255,.14); }
+  /* Address and pin: long press (right click on desktop) opens the copy menu instead of the system callout */
+  .sh-head .addr { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: context-menu; }
+  #copy-menu { position: fixed; z-index: 3000; background: var(--sheet); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.35); overflow: hidden; }
+  #copy-menu button { display: block; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg);
+    font: inherit; font-size: 15px; text-align: left; padding: 12px 16px; cursor: pointer; }
+  #copy-menu button:last-child { border-bottom: 0; }
+  #toast { position: fixed; z-index: 3001; left: 50%; bottom: 40%; transform: translateX(-50%); background: rgba(20,20,24,.9); color: #fff;
+    padding: 8px 14px; border-radius: 10px; font-size: 14px; pointer-events: none; }
   .sh-body { padding: 4px 16px 16px; }
   .sec { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; margin: 18px 0 6px; }
   .sec::before { content: ""; width: 5px; height: 20px; border-radius: 3px; background: var(--accent); }
@@ -261,6 +271,8 @@
   <div id="bar"><div id="status">Chargement…</div></div>
 </div>
 <div id="sheet"></div>
+<div id="copy-menu" hidden><button data-copy="addr">Copier l’adresse</button><button data-copy="gps">Copier les coordonnées GPS</button></div>
+<div id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -469,6 +481,17 @@ function fuelRow(n, f, s) {
     <span class="name">${meta.label}<small>${meta.sub}</small></span><span class="val">${val}</span></div>`;
 }
 
+// Navigation apps. Apple Plans and Waze take the station as destination; Google Maps too, and becomes a stop on the
+// planned trip when one is set.
+function navLinks(s) {
+  const [lat, lon] = s.pos;
+  return [
+    ['Y aller ›', `https://maps.apple.com/?daddr=${lat},${lon}`],
+    ['Google Maps', `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`],
+    ['Waze', `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`],
+  ];
+}
+
 function cardHtml(s) {
   const o = openState(s);
   const listed = FUEL_ORDER.filter(n => s.fuels[n]);
@@ -491,7 +514,7 @@ function cardHtml(s) {
         <button class="sh-close" aria-label="Fermer">✕</button>
         <button class="sh-fav ${isFav(s.id) ? 'on' : ''}" aria-label="Favori">${isFav(s.id) ? '★' : '☆'}</button>
       </div>
-      <a class="go" href="https://maps.apple.com/?daddr=${s.pos}" target="_blank">Y aller ›</a>
+      <div class="nav">${navLinks(s).map(([label, url], i) => `<a class="go${i ? ' alt' : ''}" href="${url}" target="_blank">${label}</a>`).join('')}</div>
     </div>
     <div class="sh-body">
       <div class="sec">Carburants au ${today}</div>
@@ -506,6 +529,49 @@ function cardHtml(s) {
       </div>
     </div>`;
 }
+
+// Long press (touch) or right click: calls back with the pointer position. A move of more than 10 px cancels it.
+function longPress(el, cb) {
+  let timer, x0, y0;
+  const cancel = () => clearTimeout(timer);
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; cancel(); timer = setTimeout(() => cb(x0, y0), 550); });
+  el.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel(); });
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); cb(e.clientX, e.clientY); });
+}
+
+// Copy menu: the copy itself runs from a tap on the menu, which browsers (iOS included) accept as a user gesture.
+const copyMenu = document.getElementById('copy-menu');
+let copyTarget = null;
+function openCopyMenu(s, x, y) {
+  copyTarget = s;
+  copyMenu.hidden = false;
+  const w = copyMenu.offsetWidth, h = copyMenu.offsetHeight;
+  copyMenu.style.left = `${Math.min(Math.max(8, x - w / 2), innerWidth - w - 8)}px`;
+  copyMenu.style.top = `${Math.min(Math.max(8, y - h - 12), innerHeight - h - 8)}px`;
+}
+function toast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { t.hidden = true; }, 1600);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {}
+  const ta = Object.assign(document.createElement('textarea'), { value: text });   // older WebKit fallback
+  document.body.appendChild(ta); ta.select();
+  const ok = document.execCommand('copy'); ta.remove(); return ok;
+}
+copyMenu.onclick = async e => {
+  const kind = e.target.dataset.copy, s = copyTarget;
+  copyMenu.hidden = true;
+  if (!kind || !s) return;
+  const text = kind === 'gps' ? `${s.pos[0].toFixed(6)}, ${s.pos[1].toFixed(6)}` : `${title(s.adresse)}, ${s.cp} ${title(s.ville)}`;
+  toast(await copyText(text) ? (kind === 'gps' ? 'Coordonnées copiées' : 'Adresse copiée') : 'Copie impossible');
+};
+addEventListener('pointerdown', e => { if (!copyMenu.hidden && !copyMenu.contains(e.target)) copyMenu.hidden = true; }, true);
 
 const sheet = document.getElementById('sheet');
 let current = null;   // station whose card is open
@@ -547,6 +613,7 @@ map.on('popupclose', e => { if (e.popup === cardPopup) { cardPopup = null; curre
 
 function wireCard(root, s) {
   root.querySelector('.sh-close').onclick = closeCard;
+  longPress(root.querySelector('.addr'), (x, y) => openCopyMenu(s, x, y));
   root.querySelectorAll('.alert-btn').forEach(b => b.onclick = () => toggleAlert(s, b.dataset.fuel, b));
   const btn = root.querySelector('.sh-fav');
   btn.onclick = () => {
@@ -672,7 +739,9 @@ function render() {
   for (const s of stations) {
     const rank = priceRank(s, stations), st = pinStyle(s, rank);
     const icon = L.divIcon({ className: '', html: pinHtml(s, rank, st), iconSize: [st.size, st.size] });
-    L.marker(s.pos, { icon, zIndexOffset: st.z }).on('click', () => showStation(s)).addTo(stationLayer);
+    L.marker(s.pos, { icon, zIndexOffset: st.z }).on('click', () => showStation(s))
+      .on('contextmenu', e => { L.DomEvent.stop(e); openCopyMenu(s, e.originalEvent.clientX, e.originalEvent.clientY); })
+      .addTo(stationLayer);
   }
   const cards = favorites.map(id => stations.find(x => x.id === id)).filter(Boolean).map(favCard);
   if (!cards.length) {
