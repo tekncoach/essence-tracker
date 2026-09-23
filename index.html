@@ -818,9 +818,9 @@ function drag(handles, { start, move, end }) {
   for (const h of handles) h.addEventListener('pointerdown', e => {
     if (desktop.matches || e.button > 0) return;
     const y0 = e.clientY, t0 = Date.now();
-    let moved = false;
+    let moved = false, lastDy = 0;
     const onMove = ev => {
-      const dy = ev.clientY - y0;
+      const dy = lastDy = ev.clientY - y0;
       if (!moved && Math.abs(dy) < 8) return;
       if (!moved) { moved = true; h.setPointerCapture(e.pointerId); start(); }
       move(dy);
@@ -835,7 +835,8 @@ function drag(handles, { start, move, end }) {
       const swallow = c => c.stopPropagation();
       addEventListener('click', swallow, { capture: true, once: true });
       setTimeout(() => removeEventListener('click', swallow, { capture: true }), 50);
-      const dy = ev.clientY - y0;
+      // A finger released in the iPhone's system gesture zone ends as pointercancel, with no usable position.
+      const dy = ev.type === 'pointercancel' ? lastDy : ev.clientY - y0;
       end(dy, dy / Math.max(1, Date.now() - t0));   // velocity in px/ms, positive downwards
     };
     addEventListener('pointermove', onMove);
@@ -870,13 +871,20 @@ drag([listBox.querySelector('.grab-wrap'), listBox.querySelector('.list-head')],
   },
 });
 
-// Station card: follows the finger downwards, closes past 90 px or on a downward flick.
+// Station card: follows the finger downwards, closes past 90 px or on a downward flick, and at once when dragged
+// halfway down, before its header reaches the system gesture zone.
+let cardClosing = false;
 new MutationObserver(() => {
   const handles = [...sheet.querySelectorAll('.grab-wrap, .sh-head')];
   handles.forEach(h => h.dataset.drag || (h.dataset.drag = 1, drag([h], {
-    start() { sheet.style.transition = 'none'; },
-    move(dy) { sheet.style.transform = `translateY(${Math.max(0, dy)}px)`; },
+    start() { sheet.style.transition = 'none'; cardClosing = false; },
+    move(dy) {
+      if (cardClosing) return;
+      sheet.style.transform = `translateY(${Math.max(0, dy)}px)`;
+      if (dy > sheet.offsetHeight / 2) { cardClosing = true; sheet.style.transition = sheet.style.transform = ''; closeCard(); }
+    },
     end(dy, v) {
+      if (cardClosing) return;
       sheet.style.transition = sheet.style.transform = '';   // back to the CSS slide, from where the finger left it
       if (dy > 90 || v > .5) closeCard();
     },
