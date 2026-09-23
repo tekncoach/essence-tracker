@@ -105,6 +105,8 @@
   .note { margin: 8px 0 0 !important; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px !important; }
   @media (max-width: 699px) {
     #prefs-btn, #list-btn, #favs, #bar, #list-close { display: none !important; }
+    #list { transition: transform .25s ease; }
+    #list.away { transform: translateY(110%); }   /* hidden while a station card is open, height kept */
     #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh; max-height: none;
       border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3); padding-bottom: env(safe-area-inset-bottom, 0); }
     .list-head { grid-template-columns: auto 1fr; touch-action: none; }
@@ -459,7 +461,12 @@ function cardHtml(s) {
 
 const sheet = document.getElementById('sheet');
 let current = null;   // station whose card is open
-function closeCard() { current = null; sheet.classList.remove('open'); map.closePopup(); }
+function closeCard() {
+  current = null;
+  sheet.classList.remove('open');
+  map.closePopup();
+  listBox.classList.remove('away');   // the list comes back at the height it had
+}
 function showStation(s, zoom = map.getZoom()) {
   enrich(s).then(changed => { if (changed && current === s) { render(); showStation(s); } });
   current = s;
@@ -476,11 +483,12 @@ function showStation(s, zoom = map.getZoom()) {
   wireCard(sheet, s);
   sheet.scrollTop = 0;
   sheet.classList.add('open');
+  listBox.classList.add('away');
   // Keep the pin in the part of the map the sheet leaves visible.
   map.setView(s.pos, zoom, { animate: false });
   map.panBy([0, sheet.offsetHeight / 2], { animate: false });
 }
-map.on('click', () => sheet.classList.remove('open'));
+map.on('click', () => { if (!desktop.matches && current) closeCard(); });
 
 function wireCard(root, s) {
   root.querySelector('.sh-close').onclick = closeCard;
