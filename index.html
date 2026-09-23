@@ -58,6 +58,7 @@
   #prefs { position: relative; z-index: 3; max-height: calc(100vh - 80px); overflow-y: auto; }   /* above the list sheet */
   .list-head { position: relative; }
   #list-close { position: absolute; top: 8px; right: 10px; background: rgba(255,255,255,.14); color: #fff; }
+  #search-btn { display: none; }
   .panel p { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
   .fuel-opt { display: grid; grid-template-columns: 22px 28px 1fr 28px; gap: 8px; align-items: center; padding: 5px 0;
     border-top: 1px solid var(--line); font-weight: 600; }
@@ -105,6 +106,9 @@
   .note { margin: 8px 0 0 !important; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px !important; }
   @media (max-width: 699px) {
     #prefs-btn, #list-btn, #favs, #bar, #list-close { display: none !important; }
+    #tools { justify-content: flex-end; }
+    #search-btn { display: block; }
+    #tools:not(.searching) .search { display: none; }   /* search folded behind a button: rarely needed on the go */
     #list { transition: transform .25s ease; }
     #list.away { transform: translateY(110%); }   /* hidden while a station card is open, height kept */
     #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh; max-height: none;
@@ -193,6 +197,7 @@
       <input id="q" type="search" placeholder="Ville, code postal ou adresse" autocomplete="off" enterkeyhint="search">
       <div id="results"></div>
     </div>
+    <button class="btn" id="search-btn" aria-label="Rechercher une ville ou une adresse">🔍</button>
     <button class="btn" id="prefs-btn" aria-label="Mes carburants">⛽<span class="label"> Carburants</span></button>
     <button class="btn" id="list-btn" aria-label="Liste">☰<span class="label"> Liste</span></button>
     <button class="btn" id="locate" aria-label="Autour de moi">📍<span class="label"> Autour de moi</span></button>
@@ -760,6 +765,7 @@ function pick(f) {
   results.replaceChildren();
   prefs.hidden = true;
   q.blur();
+  tools.classList.remove('searching');
   map.setView([lat, lon], ZOOM_BY_TYPE[t] || 14);
   if (t === 'housenumber' || t === 'street') searchMarker.setLatLng([lat, lon]).addTo(map); else searchMarker.remove();
 }
@@ -782,6 +788,11 @@ q.oninput = () => {
   }, 250);
 };
 map.on('click', () => { results.replaceChildren(); prefs.hidden = true; });
+const tools = document.getElementById('tools');
+document.getElementById('search-btn').onclick = () => {
+  tools.classList.toggle('searching');
+  if (tools.classList.contains('searching')) q.focus(); else results.replaceChildren();
+};
 q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key === 'Escape') results.replaceChildren(); };
 
 // Mobile gestures. drag() reports the vertical move of a finger that started on one of the handles; a move of
