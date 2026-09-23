@@ -458,7 +458,8 @@ async function enrich(s) {
 }
 
 function logoHtml(s) {
-  const file = LOGOS.has(s.short) ? s.short : !s.brand || s.short === 'autre' ? 'autre' : null;
+  const file = /costco/i.test(s.name || '') ? 'costco'   // no brand code at 2aaz: recognised by its station name
+    : LOGOS.has(s.short) ? s.short : !s.brand || s.short === 'autre' ? 'autre' : null;
   return file ? `<img src="logos/${file}.png" alt="">` : `<span class="initials">${s.brand.slice(0, 3).toUpperCase()}</span>`;
 }
 
