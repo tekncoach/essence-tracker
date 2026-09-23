@@ -1,4 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="96 72 320 372">
-  <path d="M256 84c-80 0-144 62-144 140 0 100 144 208 144 208s144-108 144-208c0-78-64-140-144-140z" fill="#f08a3c"/>
-  <path d="M256 150s-54 64-54 100a54 54 0 0 0 108 0c0-36-54-100-54-100z" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="240 225 480 492"><defs>
+    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0b1030"/><stop offset=".6" stop-color="#1c2f8a"/><stop offset="1" stop-color="#4263eb"/></linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc56b"/><stop offset=".5" stop-color="#f7822d"/><stop offset="1" stop-color="#c2410c"/></linearGradient>
+    <linearGradient id="grey" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b8c0d8"/></linearGradient>
+    <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#69db7c"/><stop offset="1" stop-color="#2b8a3e"/></linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <path d="M480 240c-122 0-220 95-220 214 0 155 220 250 220 250s220-95 220-250c0-119-98-214-220-214z" fill="url(#pin)" stroke="#fff" stroke-width="12"/>
+  <path d="M300 392c24-72 92-116 166-122-64 28-110 74-134 138z" fill="#fff" opacity=".5"/>
+  <g transform="translate(380 348) scale(2.0)" fill="#fff">
+    <rect x="18" y="8" width="44" height="80" rx="9"/>
+    <rect x="12" y="84" width="56" height="10" rx="4"/>
+    <rect x="27" y="19" width="26" height="20" rx="4" fill="#f7822d"/>
+    <path d="M62 36h8a8 8 0 0 1 8 8v30a5 5 0 0 0 10 0V40l-10-12" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
