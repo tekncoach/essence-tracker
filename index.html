@@ -48,18 +48,37 @@
   .search { position: relative; flex: 1; min-width: 0; }
   #q { width: 100%; font: inherit; font-size: 14px; padding: 8px 10px; border: 0; border-radius: 10px;
     background: var(--card); color: var(--fg); box-shadow: 0 1px 6px rgba(0,0,0,.15); }
-  #results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--sheet); border-radius: 10px;
+  #route-chip { pointer-events: auto; align-self: flex-start; display: flex; align-items: center; gap: 8px; max-width: 100%;
+    background: var(--head); color: #fff; border-radius: 18px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; }
+  #route-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #route-chip .x { width: 24px; height: 24px; font-size: 12px; background: rgba(255,255,255,.18); color: #fff; }
+  #route .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 0; font-size: 14px; }
+  #route .field small { color: var(--muted); }
+  #route input, #route select { font: inherit; font-size: 16px; padding: 7px 9px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--fg); }
+  #route .search { margin-top: 6px; }
+  #dest { width: 100%; }
+  #range { width: 110px; }
+  #route-go { width: 100%; margin-top: 12px; border: 0; border-radius: 10px; padding: 10px; background: var(--accent); color: #fff;
+    font: inherit; font-weight: 700; cursor: pointer; }
+  #route-go:disabled { opacity: .5; cursor: default; }
+  #route-info { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .row .badge { display: inline-block; margin-top: 2px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+    padding: 1px 6px; border-radius: 6px; }
+  #results, #dest-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--sheet); border-radius: 10px;
     box-shadow: 0 4px 16px rgba(0,0,0,.25); overflow: hidden; }
-  #results button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--fg);
+  #results button, #dest-results button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--fg);
     font: inherit; font-size: 14px; padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--line); }
-  #results button:hover, #results button:focus { background: var(--line); }
-  #results small { color: var(--muted); margin-left: 6px; }
+  #results button:hover, #results button:focus, #dest-results button:hover { background: var(--line); }
+  #results small, #dest-results small { color: var(--muted); margin-left: 6px; }
+  #dest-results { z-index: 2; }
   #tools .btn { font-size: 14px; padding: 8px 10px; border-radius: 10px; white-space: nowrap; }
   @media (max-width: 699px) { #tools .btn .label { display: none; } }
   .ico { width: 20px; height: 20px; vertical-align: -4px; }
   /* Round white map buttons on mobile, in light and dark mode alike (as map controls usually are) */
   @media (max-width: 699px) {
-    #tools #search-btn, #tools #locate { width: 44px; height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+    #tools #search-btn, #tools #route-btn, #tools #locate { width: 44px; height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center;
       background: #fff; color: #1c1c1e; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
     #tools .btn .ico { width: 22px; height: 22px; }
   }
@@ -240,9 +259,23 @@
       <div id="results"></div>
     </div>
     <button class="btn" id="search-btn" aria-label="Rechercher une ville ou une adresse"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
+    <button class="btn" id="route-btn" aria-label="Stations sur mon trajet"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="5" r="2.2"/><path d="M8.2 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.8"/></svg><span class="label"> Trajet</span></button>
     <button class="btn" id="prefs-btn" aria-label="Mes carburants"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h12M4 10h10"/><path d="M14 8h2a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V8.5L18 5.5"/></svg><span class="label"> Carburants</span></button>
     <button class="btn" id="list-btn" aria-label="Liste"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3"/></svg><span class="label"> Liste</span></button>
     <button class="btn" id="locate" aria-label="Autour de moi"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.6 3.4 3.5 10.6c-.8.3-.7 1.5.1 1.7l6.6 1.5 1.5 6.6c.2.8 1.4.9 1.7.1L20.6 3.4z"/></svg><span class="label"> Autour de moi</span></button>
+  </div>
+  <button id="route-chip" hidden><span></span><span class="x" role="button" aria-label="Effacer le trajet">✕</span></button>
+  <div id="route" class="panel" hidden>
+    <div class="panel-head"><h3>Stations sur mon trajet</h3><button class="x" id="route-close" aria-label="Fermer">✕</button></div>
+    <div class="search">
+      <input id="dest" type="search" placeholder="Destination : ville ou adresse" autocomplete="off" enterkeyhint="search">
+      <div id="dest-results"></div>
+    </div>
+    <label class="field">Kilomètres restants <small>(optionnel)</small><input id="range" type="number" inputmode="numeric" min="0" max="2000" placeholder="ex. 180"></label>
+    <label class="field">Détour maximum
+      <select id="corridor"><option value="1">1 km</option><option value="2">2 km</option><option value="5">5 km</option><option value="10">10 km</option></select></label>
+    <button id="route-go" disabled>Voir les stations sur le trajet</button>
+    <div id="route-info"></div>
   </div>
   <div id="prefs" class="panel" hidden>
     <div class="panel-head"><h3>Mes carburants</h3><button class="x" id="prefs-close" aria-label="Fermer">✕</button></div>
@@ -380,7 +413,7 @@ function parseStation(r) {
     fuels[x['@nom']] = { rupture: true, since: parseMaj(x['@debut']), definitive: x['@type'] === 'definitive' };
   }
   const official = [r.geom.lat, r.geom.lon];
-  return { id: r.id, official, tile: tileKey(official), ...placed(r.id, official), adresse: r.adresse, ville: r.ville, cp: r.cp,
+  return { id: r.id, official, tile: tileKey(official), ...placed(r.id, official), adresse: r.adresse, ville: r.ville, cp: r.cp, pop: r.pop,
            automate: r.horaires_automate_24_24 === 'Oui', hours: todayHours(r), fuels };
 }
 const available = s => wanted.filter(n => s.fuels[n] && !s.fuels[n].rupture);
@@ -432,7 +465,7 @@ function logoHtml(s) {
 // Price rank in [0, 1] (0 = cheapest) of the station's preferred fuel (SP98, else E10) among the
 // stations selling that fuel; null when neither is buyable right now.
 function priceRank(s, all) {
-  if (openState(s).open === false) return null;
+  if (openState(s).open === false || !reachable(s)) return null;
   const n = available(s)[0];
   if (!n) return null;
   const prices = all.map(x => x.fuels[n]).filter(f => f && !f.rupture).map(f => f.price).sort((a, b) => a - b);
@@ -487,7 +520,8 @@ function navLinks(s) {
   const [lat, lon] = s.pos;
   return [
     ['Y aller ›', `https://maps.apple.com/?daddr=${lat},${lon}`],
-    ['Google Maps', `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`],
+    ['Google Maps', route ? `https://www.google.com/maps/dir/?api=1&origin=${route.start}&destination=${route.dest}&waypoints=${lat},${lon}&travelmode=driving`
+                          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`],
     ['Waze', `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`],
   ];
 }
@@ -507,7 +541,8 @@ function cardHtml(s) {
       <div>
         <h2>${title(s.name) || s.brand || 'Station'}</h2>
         <div class="addr">${title(s.adresse)}<br>${s.cp} ${title(s.ville)}</div>
-        <div class="meta">${origin ? `${distKm(origin, s.pos).toFixed(1).replace('.', ',')} km à vol d’oiseau` : ''}
+        <div class="meta">${route && s.along !== undefined ? `Au km ${Math.round(s.along)} du trajet · à ${s.off.toFixed(1).replace('.', ',')} km de la route`
+          : origin ? `${distKm(origin, s.pos).toFixed(1).replace('.', ',')} km à vol d’oiseau` : ''}
           <span class="pill ${{ true: 'ok', false: 'ko' }[o.open] || ''}">${o.pill}</span></div>
       </div>
       <div class="sh-actions">
@@ -694,10 +729,131 @@ function setStatus(text) {
   renderList();
 }
 
+// Trip mode. OSRM (public demo server, reasonable non-commercial use, fallback on the FOSSGIS mirror) gives the road;
+// the official feed has no "near a line" filter, so stations are fetched per ~25 km stretch (bounding box widened by
+// the corridor) and kept when their distance to the road is within the corridor.
+const ROUTERS = ['https://router.project-osrm.org/route/v1/driving/', 'https://routing.openstreetmap.de/routed-car/route/v1/driving/'];
+const RESERVE_KM = 15;   // safety margin kept out of the remaining range
+let route = null;        // { label, start, dest, line: [[lat, lon]], cum: [km], km, min, range, corridor }
+const routeLayer = L.layerGroup().addTo(map);
+
+// Distance off the road and position along it (km), by projection on the nearest segment.
+function project(p, line, cum) {
+  const k = Math.cos(p[0] * Math.PI / 180);
+  let best = { off: Infinity, along: 0 };
+  for (let i = 1; i < line.length; i++) {
+    const [ay, ax] = line[i - 1], [by, bx] = line[i];
+    const dx = (bx - ax) * k, dy = by - ay, px = (p[1] - ax) * k, py = p[0] - ay;
+    const t = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy || 1)));
+    const off = Math.hypot(px - t * dx, py - t * dy) * 111.2;
+    if (off < best.off) best = { off, along: cum[i - 1] + t * (cum[i] - cum[i - 1]) };
+  }
+  return best;
+}
+const reachable = s => !route?.range || s.along + 2 * s.off <= route.range - RESERVE_KM;
+
+async function fetchRoute(start, dest) {
+  for (const base of ROUTERS) {
+    try {
+      const r = await fetch(`${base}${start[1]},${start[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`);
+      const d = await r.json();
+      if (d.code === 'Ok') return d.routes[0];
+    } catch {}
+  }
+  throw new Error('Itinéraire indisponible pour le moment');
+}
+
+async function routeStations() {
+  const { line, cum, corridor } = route;
+  const boxes = [];
+  for (let i = 0, from = 0; i < line.length; i++) {
+    if (cum[i] - cum[from] < 25 && i < line.length - 1) continue;
+    const part = line.slice(from, i + 1), lats = part.map(p => p[0]), lons = part.map(p => p[1]);
+    const dLat = corridor / 111.2, dLon = corridor / (111.2 * Math.cos(lats[0] * Math.PI / 180));
+    boxes.push(`in_bbox(geom, ${(Math.min(...lats) - dLat).toFixed(4)}, ${(Math.min(...lons) - dLon).toFixed(4)}, ${(Math.max(...lats) + dLat).toFixed(4)}, ${(Math.max(...lons) + dLon).toFixed(4)})`);
+    from = i;
+  }
+  const where = encodeURIComponent(boxes.join(' OR '));
+  const kept = [];
+  for (let offset = 0, total = 1; offset < total; offset += 100) {
+    const d = await (await fetch(`${OFFICIAL}/records?where=${where}&select=id,geom&limit=100&offset=${offset}`)).json();
+    total = d.total_count;
+    for (const r of d.results) {
+      const pr = project([r.geom.lat, r.geom.lon], line, cum);
+      if (pr.off <= corridor) kept.push({ id: r.id, ...pr });
+    }
+  }
+  const out = [];
+  for (let i = 0; i < kept.length; i += 100) {
+    const ids = kept.slice(i, i + 100);
+    const d = await (await fetch(`${OFFICIAL}/records?where=${encodeURIComponent(`id IN (${ids.map(x => x.id).join(',')})`)}&limit=100`)).json();
+    for (const r of d.results) out.push(Object.assign(parseStation(r), ids.find(x => x.id === r.id)));
+  }
+  await applyBrands(out);
+  return out;
+}
+
+async function startRoute(dest, label) {
+  const c = map.getCenter();
+  const start = origin || [c.lat, c.lng];
+  const range = +document.getElementById('range').value || null;
+  const corridor = +document.getElementById('corridor').value;
+  store.set('corridor', corridor);
+  const info = document.getElementById('route-info');
+  info.textContent = 'Calcul de l’itinéraire…';
+  try {
+    const r = await fetchRoute(start, dest);
+    const line = r.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+    const cum = [0];
+    for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + distKm(line[i - 1], line[i]));
+    route = { label, start, dest, line, cum, km: r.distance / 1000, min: r.duration / 60, range, corridor };
+    stations = [];   // those around the view have no position on the trip; the list redraws on every map move
+    render();
+    routeLayer.clearLayers();
+    L.polyline(line, { color: '#f08a3c', weight: 5, opacity: .85 }).addTo(routeLayer);
+    L.circleMarker(dest, { radius: 7, color: '#fff', weight: 3, fillColor: '#f08a3c', fillOpacity: 1 }).addTo(routeLayer);
+    // Keep the road clear of the panels: list on the left on desktop, list sheet at the bottom on mobile.
+    map.fitBounds(L.latLngBounds(line), desktop.matches ? { paddingTopLeft: [410, 110], paddingBottomRight: [30, 30] }
+                                                        : { paddingTopLeft: [20, 120], paddingBottomRight: [20, innerHeight * .45] });
+    info.textContent = 'Recherche des stations sur le trajet…';
+    setStatus('Recherche des stations sur le trajet…');
+    stations = await routeStations();
+    loaded = null;
+    render();
+    showRouteChip();
+    info.textContent = '';
+    setStatus(`${stations.length} stations à moins de ${corridor} km du trajet`);
+    document.getElementById('route').hidden = true;
+    listSort = 'dist';
+    document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x.dataset.sort === 'dist'));
+    if (!desktop.matches) snapList(listSnaps()[1]); else { listBox.hidden = false; }
+    renderList();
+  } catch (e) {
+    info.textContent = e.message;
+  }
+}
+
+function clearRoute() {
+  route = null;
+  routeLayer.clearLayers();
+  document.getElementById('route-chip').hidden = true;
+  listSort = 'price';
+  document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x.dataset.sort === 'price'));
+  loadStations(map.getCenter());
+}
+
+function showRouteChip() {
+  const chip = document.getElementById('route-chip');
+  const h = Math.floor(route.min / 60), m = Math.round(route.min % 60);
+  chip.querySelector('span').textContent = `↦ ${route.label} · ${Math.round(route.km)} km · ${h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`}${route.range ? ` · autonomie ${route.range} km` : ''}`;
+  chip.hidden = false;
+}
+
 let loaded = null, loadSeq = 0;   // last query centre and radius; sequence number to drop stale responses
 const viewRadiusKm = () => { const b = map.getBounds(); return distKm([b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]) / 2; };
 
 async function loadStations(center = map.getCenter()) {
+  if (route) { render(); return; }   // trip mode: the stations are those along the road
   const seq = ++loadSeq;
   const c = Array.isArray(center) ? center : [center.lat, center.lng];
   const radius = Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, viewRadiusKm()));
@@ -728,7 +884,7 @@ async function loadStations(center = map.getCenter()) {
 
     const processed = new Date(meta.metas.default.data_processed);
     setStatus(`${stations.length} stations · flux officiel ${age(processed)} (${fmtDate(processed)})`);
-    refinePositions();
+    if (!route) refinePositions();
   } catch (e) {
     setStatus('Erreur de chargement : ' + e.message);
   }
@@ -770,11 +926,14 @@ function renderList() {
   document.getElementById('fuel-chip').innerHTML =
     `<span class="bar" style="background:${main.color}"></span>${wanted[0]} <small>${main.sub || ''}</small>${wanted.length > 1 ? ` <small>+${wanted.length - 1}</small>` : ''}`;
   if (listBox.hidden) return;
+  document.querySelector('.seg button[data-sort="dist"]').textContent = route ? 'Sur le trajet' : 'La plus proche';
   const c = map.getCenter(), from = origin || [c.lat, c.lng];
-  const km = s => distKm(from, s.pos);
-  const buyable = s => available(s).length && openState(s).open !== false;
+  const km = s => route ? s.along : distKm(from, s.pos);
+  const buyable = s => available(s).length && openState(s).open !== false && reachable(s);
   const ok = stations.filter(buyable), off = stations.filter(s => !buyable(s));
   const byKm = (a, b) => km(a) - km(b);
+  // With a range: the last buyable station before running dry is the one not to miss.
+  const last = route?.range && ok.reduce((a, b) => (!a || b.along > a.along ? b : a), null);
   const rows = listSort === 'dist' ? [...stations].sort(byKm) : [...ok.sort((a, b) => {
     const [fa, fb] = [available(a)[0], available(b)[0]];
     return wanted.indexOf(fa) - wanted.indexOf(fb) || a.fuels[fa].price - b.fuels[fb].price;
@@ -785,14 +944,17 @@ function renderList() {
     const n = available(s)[0], closed = openState(s).open === false;
     return `<button class="row${buyable(s) ? '' : ' off'}" data-id="${s.id}">${logoHtml(s)}
       <span class="who"><b>${isFav(s.id) ? '⭐ ' : ''}${title(s.name) || s.brand || 'Station'}</b>
-      <small>${title(s.ville)}</small><small>${km(s).toFixed(1).replace('.', ',')} km</small></span>
-      <span class="p">${!n ? '<span class="na">Indisponible</span>' : closed ? '<span class="na">Fermée</span>'
+      <small>${title(s.ville)}${route && s.pop === 'A' ? ' · autoroute' : ''}</small>
+      <small>${route ? `km ${Math.round(s.along)} · à ${s.off.toFixed(1).replace('.', ',')} km de la route` : `${km(s).toFixed(1).replace('.', ',')} km`}</small>
+      ${s === last ? '<span class="badge">Dernière avant la réserve</span>' : ''}</span>
+      <span class="p">${route && !reachable(s) ? '<span class="na">Hors autonomie</span>' : !n ? '<span class="na">Indisponible</span>' : closed ? '<span class="na">Fermée</span>'
         : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}</span></button>`;
   }).join('');
   const rowsBox = document.getElementById('list-rows');
   if (rowsBox.dataset.html !== html) { rowsBox.innerHTML = html; rowsBox.dataset.html = html; }
   document.getElementById('list-foot').textContent =
-    `${statusText} · distance depuis ${origin ? 'votre départ' : 'le centre de la carte'} · carte © OpenStreetMap`;
+    route ? `${statusText} · itinéraire © OSRM, carte © OpenStreetMap${route.range ? ` · marge de sécurité ${RESERVE_KM} km` : ''}`
+          : `${statusText} · distance depuis ${origin ? 'votre départ' : 'le centre de la carte'} · carte © OpenStreetMap`;
 }
 document.getElementById('list-btn').onclick = () => {
   listBox.hidden = !listBox.hidden;
@@ -827,6 +989,7 @@ map.on('moveend', () => {
   moveTimer = setTimeout(() => {
     const c = map.getCenter();
     store.set('lastView', { c: [c.lat, c.lng], z: map.getZoom() });
+    if (route) return;
     if (map.getZoom() < MIN_LOAD_ZOOM) {
       if (!loaded) setStatus('Zoomez sur une zone ou touchez « Autour de moi »');
       return;
@@ -956,46 +1119,50 @@ function renderAlerts() {
 document.getElementById('prefs-btn').onclick = () => { prefs.hidden = !prefs.hidden; renderPrefs(); };
 document.getElementById('prefs-close').onclick = () => { prefs.hidden = true; };
 
-// Search: Base Adresse Nationale (city, postcode or full address), zoom according to what was found.
+// Address autocomplete (Base Adresse Nationale), shared by the map search and the trip destination.
+function autocomplete(input, box, onPick) {
+  let timer, hits = [];
+  input.oninput = () => {
+    clearTimeout(timer);
+    const text = input.value.trim();
+    if (text.length < 3) { box.replaceChildren(); return; }
+    timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(text)}&limit=5&autocomplete=1`);
+        hits = (await r.json()).features;
+      } catch { hits = []; }
+      if (input.value.trim() !== text) return;
+      box.replaceChildren(...hits.map(f => {
+        const b = document.createElement('button');
+        b.innerHTML = `${f.properties.label}${f.properties.type === 'municipality' ? `<small>${f.properties.postcode}</small>` : ''}`;
+        b.onclick = () => { input.value = f.properties.label; box.replaceChildren(); input.blur(); onPick(f); };
+        return b;
+      }));
+    }, 250);
+  };
+  input.onkeydown = e => {
+    if (e.key === 'Enter' && hits[0]) { input.value = hits[0].properties.label; box.replaceChildren(); input.blur(); onPick(hits[0]); }
+    if (e.key === 'Escape') box.replaceChildren();
+  };
+}
+
+// Map search: zoom according to what was found.
 const ZOOM_BY_TYPE = { municipality: 13, locality: 15, street: 16, housenumber: 17 };
 const q = document.getElementById('q'), results = document.getElementById('results');
 const searchMarker = L.circleMarker([0, 0], { radius: 8, color: '#2d7cf6', weight: 3, fillOpacity: .2 });
-let searchTimer, hits = [];
-function pick(f) {
+autocomplete(q, results, f => {
   const [lon, lat] = f.geometry.coordinates, t = f.properties.type;
-  q.value = f.properties.label;
-  results.replaceChildren();
   prefs.hidden = true;
-  q.blur();
   tools.classList.remove('searching');
   map.setView([lat, lon], ZOOM_BY_TYPE[t] || 14);
   if (t === 'housenumber' || t === 'street') searchMarker.setLatLng([lat, lon]).addTo(map); else searchMarker.remove();
-}
-q.oninput = () => {
-  clearTimeout(searchTimer);
-  const text = q.value.trim();
-  if (text.length < 3) { results.replaceChildren(); return; }
-  searchTimer = setTimeout(async () => {
-    try {
-      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(text)}&limit=5&autocomplete=1`);
-      hits = (await r.json()).features;
-    } catch { hits = []; }
-    if (q.value.trim() !== text) return;
-    results.replaceChildren(...hits.map(f => {
-      const b = document.createElement('button');
-      b.innerHTML = `${f.properties.label}${f.properties.type === 'municipality' ? `<small>${f.properties.postcode}</small>` : ''}`;
-      b.onclick = () => pick(f);
-      return b;
-    }));
-  }, 250);
-};
+});
 map.on('click', () => { results.replaceChildren(); prefs.hidden = true; });
 const tools = document.getElementById('tools');
 document.getElementById('search-btn').onclick = () => {
   tools.classList.toggle('searching');
   if (tools.classList.contains('searching')) q.focus(); else results.replaceChildren();
 };
-q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key === 'Escape') results.replaceChildren(); };
 
 // Mobile gestures. drag() reports the vertical move of a finger that started on one of the handles; a move of
 // less than 8 px stays a tap, so the buttons inside the handles keep working.
@@ -1079,6 +1246,22 @@ new MutationObserver(() => {
     },
   })));
 }).observe(sheet, { childList: true });
+
+// Trip panel.
+const routePanel = document.getElementById('route');
+let routeDest = null;
+document.getElementById('corridor').value = store.get('corridor') || 2;
+autocomplete(document.getElementById('dest'), document.getElementById('dest-results'), f => {
+  const [lon, lat] = f.geometry.coordinates;
+  routeDest = { pos: [lat, lon], label: f.properties.type === 'municipality' ? f.properties.city : f.properties.label };
+  document.getElementById('route-go').disabled = false;
+});
+document.getElementById('route-go').onclick = () => routeDest && startRoute(routeDest.pos, routeDest.label);
+document.getElementById('route-btn').onclick = () => { routePanel.hidden = !routePanel.hidden; prefs.hidden = true; if (!routePanel.hidden && !routeDest) document.getElementById('dest').focus(); };
+document.getElementById('route-close').onclick = () => { routePanel.hidden = true; };
+document.getElementById('route-chip').onclick = e => {
+  if (e.target.closest('.x')) clearRoute(); else routePanel.hidden = !routePanel.hidden;
+};
 
 // ?station=<id> (a notification links there) opens that station's card once it is loaded, wherever it is.
 let pendingStation = +new URLSearchParams(location.search).get('station') || null;
