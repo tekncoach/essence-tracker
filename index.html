@@ -126,6 +126,9 @@
     #list.snapping { transition: height .25s ease; }
     #list.peek { background: var(--head); }   /* folded: the area under the header matches it */
     #list.peek > :not(.grab-wrap):not(.list-head) { visibility: hidden; }   /* would spill into the safe area */
+    #list.peek .list-head { padding-bottom: 6px; }
+    /* Whatever the page does not cover at the bottom (safe area, browser bar area) blends with the sheet header */
+    html, body { background: var(--head); }
     #sheet .sh-head { touch-action: none; }
   }
   #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
