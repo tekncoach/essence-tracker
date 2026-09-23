@@ -298,7 +298,9 @@ let favorites = store.get('favorites') || [];   // station ids, in the order the
 const isFav = id => favorites.includes(id);
 let wanted = store.get('fuels') || DEFAULT_FUELS;   // fuels the user cares about, most preferred first
 
-const map = L.map('map', { zoomControl: false }).setView(origin || FRANCE, origin ? 14 : 6);
+// Reopen where the map was left (saved on every move), else on the start point, else on France.
+const lastView = store.get('lastView');
+const map = L.map('map', { zoomControl: false }).setView(lastView?.c || origin || FRANCE, lastView?.z || (origin ? 14 : 6));
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '© OpenStreetMap · prix-carburants.gouv.fr'
 }).addTo(map);
@@ -731,11 +733,12 @@ let moveTimer;
 map.on('moveend', () => {
   clearTimeout(moveTimer);
   moveTimer = setTimeout(() => {
+    const c = map.getCenter();
+    store.set('lastView', { c: [c.lat, c.lng], z: map.getZoom() });
     if (map.getZoom() < MIN_LOAD_ZOOM) {
       if (!loaded) setStatus('Zoomez sur une zone ou touchez « Autour de moi »');
       return;
     }
-    const c = map.getCenter();
     if (!loaded) return loadStations(c);
     const moved = distKm(loaded.center, [c.lat, c.lng]);
     if (moved > loaded.radius * .4 || viewRadiusKm() > loaded.radius * 1.1 && loaded.radius < MAX_RADIUS_KM) loadStations(c);
@@ -746,7 +749,7 @@ document.getElementById('locate').onclick = () => {
   if (!navigator.geolocation) { setStatus('Géolocalisation non disponible'); return; }
   setStatus('Localisation…');
   navigator.geolocation.getCurrentPosition(
-    p => setOrigin([p.coords.latitude, p.coords.longitude], false),
+    p => { store.set('autoLocate', true); setOrigin([p.coords.latitude, p.coords.longitude], false); },
     e => setStatus(window.isSecureContext ? `Localisation refusée : ${e.message}`
                                           : 'Localisation impossible : la page doit être servie en https'),
     { enableHighAccuracy: true, timeout: 10000 });
@@ -924,11 +927,13 @@ new MutationObserver(() => {
   [totalCodes, brandNames] = await Promise.all(['total-codes.json', 'brands/names.json']
     .map(f => fetch(f).then(r => r.json()).catch(() => ({}))));
   if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
-  if (origin) return loadStations(origin);
-  setStatus('Zoomez sur une zone ou touchez « Autour de moi »');
-  // Locate straight away only if the browser already allowed it; otherwise wait for the button.
+  if (map.getZoom() >= MIN_LOAD_ZOOM) loadStations(map.getCenter());
+  else if (origin) loadStations(origin);
+  else setStatus('Zoomez sur une zone ou touchez « Autour de moi »');
+  // Locate straight away once « Autour de moi » has worked here before: an installed iOS app may not report the
+  // permission as granted between launches, so the browser's answer alone is not enough.
   const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-  if (perm?.state === 'granted') document.getElementById('locate').click();
+  if (store.get('autoLocate') || perm?.state === 'granted') document.getElementById('locate').click();
 })();
 </script>
 </body>
