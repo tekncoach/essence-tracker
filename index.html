@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Essence</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1c1c1e; --muted: #6e6e73; --card: rgba(255,255,255,.96); --sheet: #ffffff;
+    --head: #1f2230; --accent: #f08a3c;
+    --ok: #1f9d55; --ko: #d63a3a; --stale: #c98a00; --line: #e5e5ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #000; --fg: #f2f2f7; --muted: #98989f; --card: rgba(28,28,30,.96); --sheet: #1c1c1e; --line: #38383a; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { position: absolute; inset: 0; }
+
+  #top { position: absolute; z-index: 1000; top: env(safe-area-inset-top, 0); left: 0; right: 0;
+    padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  #favs { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 6px; pointer-events: auto; }
+  @media (min-width: 700px) { #favs { grid-template-columns: repeat(auto-fit, 150px); } }
+  .fav-card { min-width: 0; background: var(--card); border-radius: 12px; padding: 6px 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18); cursor: pointer; border: 0; text-align: left; color: var(--fg); font: inherit; }
+  .fav-card b { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fav-card .fuels { display: flex; flex-direction: column; margin-top: 2px; font-size: 12px; font-weight: 600; }
+  #bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; pointer-events: auto; }
+  #tools { display: flex; gap: 6px; align-items: flex-start; pointer-events: auto; max-width: 640px; }
+  .search { position: relative; flex: 1; min-width: 0; }
+  #q { width: 100%; font: inherit; font-size: 14px; padding: 8px 10px; border: 0; border-radius: 10px;
+    background: var(--card); color: var(--fg); box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+  #results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--sheet); border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25); overflow: hidden; }
+  #results button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--fg);
+    font: inherit; font-size: 14px; padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--line); }
+  #results button:hover, #results button:focus { background: var(--line); }
+  #results small { color: var(--muted); margin-left: 6px; }
+  #tools .btn { font-size: 14px; padding: 8px 10px; border-radius: 10px; white-space: nowrap; }
+  @media (max-width: 699px) { #tools .btn .label { display: none; } }
+  .panel { pointer-events: auto; background: var(--sheet); border-radius: 12px; padding: 10px 12px; max-width: 320px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+  .panel h3 { margin: 0 0 2px; font-size: 15px; }
+  .panel p { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .fuel-opt { display: grid; grid-template-columns: 22px 28px 1fr 28px; gap: 8px; align-items: center; padding: 5px 0;
+    border-top: 1px solid var(--line); font-weight: 600; }
+  .fuel-opt img { width: 28px; height: 28px; }
+  .fuel-opt input { width: 18px; height: 18px; }
+  .fuel-opt .up { border: 0; background: var(--line); color: var(--fg); border-radius: 6px; cursor: pointer; height: 24px; }
+  .fuel-opt .rank { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
+  #status, .btn { background: var(--card); color: var(--muted); font: inherit; font-size: 12px; padding: 4px 8px;
+    border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.15); border: 0; }
+  .btn { color: var(--fg); font-weight: 600; cursor: pointer; }
+
+  .pin { width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 3px solid var(--ok);
+    display: grid; place-items: center; overflow: hidden; box-shadow: 0 1px 5px rgba(0,0,0,.35); }
+  .pin img { width: 28px; height: 28px; object-fit: contain; }
+  .pin .initials { font-weight: 700; font-size: 12px; color: #333; }
+  .pin.ko { border-color: var(--ko); filter: grayscale(.7); opacity: .75; }
+  .pin img { width: calc(var(--s) * .7px); height: calc(var(--s) * .7px); }
+  .pin.fav { border-width: 4px; }
+  .fav-card.hint { grid-column: 1 / -1; color: var(--muted); font-size: 12px; cursor: default; max-width: 340px; }
+  .star { position: absolute; top: -6px; right: -6px; font-size: 16px; text-shadow: 0 0 3px #fff; }
+  .tag { position: absolute; top: 100%; left: 50%; transform: translate(-50%, 3px); white-space: nowrap;
+    background: var(--ok); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 6px; }
+  .tag.ko { background: var(--ko); color: #fff; }
+  .marker-wrap { position: relative; }
+  .origin { width: 18px; height: 18px; border-radius: 50%; background: #2d7cf6; border: 3px solid #fff;
+    box-shadow: 0 0 0 6px rgba(45,124,246,.25), 0 1px 4px rgba(0,0,0,.4); }
+
+  /* Station card: bottom sheet on mobile, map popup on desktop */
+  #sheet { position: absolute; z-index: 1100; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto;
+    background: var(--sheet); border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3);
+    transform: translateY(105%); transition: transform .25s ease; padding-bottom: env(safe-area-inset-bottom, 0); }
+  #sheet.open { transform: none; }
+  .st-pop .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-radius: 16px; background: var(--sheet); color: var(--fg); }
+  .st-pop .leaflet-popup-content { margin: 0; width: 360px !important; max-height: calc(100vh - 200px); overflow-y: auto; font: inherit; }
+  .st-pop .leaflet-popup-tip { background: var(--sheet); }
+  .sh-head { background: var(--head); color: #fff; padding: 16px; display: grid;
+    grid-template-columns: 64px 1fr auto; gap: 12px; align-items: start; position: sticky; top: 0; z-index: 1; }
+  .sh-logo { width: 64px; height: 64px; border-radius: 50%; background: #fff; display: grid; place-items: center; }
+  .sh-logo img { width: 46px; height: 46px; object-fit: contain; }
+  .sh-logo .initials { color: #333; font-weight: 700; }
+  .sh-head h2 { margin: 0 0 4px; font-size: 19px; font-weight: 500; }
+  .sh-head .addr { font-size: 13px; opacity: .85; }
+  .sh-head .meta { font-size: 13px; margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill { background: #fff; color: #2d5bd7; font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .pill.ko { color: var(--ko); } .pill.ok { color: var(--ok); }
+  .sh-actions { display: flex; flex-direction: column; gap: 8px; }
+  .sh-fav { width: 32px; height: 32px; border-radius: 50%; border: 0; background: #fff; color: #888; font-size: 18px; cursor: pointer; }
+  .sh-fav.on { color: #f5b301; }
+  .sh-close { width: 32px; height: 32px; border-radius: 50%; border: 0; background: #fff; color: #000; font-size: 18px; cursor: pointer; }
+  .go { grid-column: 2 / 4; justify-self: end; background: var(--accent); color: #fff !important; text-decoration: none;
+    font-weight: 600; padding: 7px 16px; border-radius: 18px; }
+  .sh-body { padding: 4px 16px 16px; }
+  .sec { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; margin: 18px 0 6px; }
+  .sec::before { content: ""; width: 5px; height: 20px; border-radius: 3px; background: var(--accent); }
+  .fuel { display: grid; grid-template-columns: 5px 34px 1fr auto; gap: 10px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .fuel .bar { width: 5px; height: 26px; border-radius: 3px; }
+  .fuel img { width: 34px; height: 34px; }
+  .fuel .name { font-size: 17px; font-weight: 700; }
+  .fuel .name small { font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 4px; }
+  .fuel .val { text-align: right; }
+  .fuel .price { font-size: 22px; font-weight: 700; }
+  .fuel .na { color: var(--muted); font-size: 16px; }
+  .fuel .when { display: block; font-size: 11px; color: var(--muted); }
+  .fuel .when.stale { color: var(--stale); }
+  .info { font-size: 13px; color: var(--muted); margin: 4px 0; }
+  .info.ok { color: var(--ok); } .info.ko { color: var(--ko); }
+  .links { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin-top: 10px; }
+  .links a { color: #2d7cf6; font-weight: 600; text-decoration: none; }
+  .ok { color: var(--ok); } .ko { color: var(--ko); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top">
+  <div id="tools">
+    <div class="search">
+      <input id="q" type="search" placeholder="Ville, code postal ou adresse" autocomplete="off" enterkeyhint="search">
+      <div id="results"></div>
+    </div>
+    <button class="btn" id="prefs-btn" aria-label="Mes carburants">⛽<span class="label"> Carburants</span></button>
+    <button class="btn" id="locate" aria-label="Autour de moi">📍<span class="label"> Autour de moi</span></button>
+  </div>
+  <div id="prefs" class="panel" hidden>
+    <h3>Mes carburants</h3>
+    <p>Cochez ceux qui vous intéressent. Le premier disponible fixe la taille du pin et s’affiche en premier.</p>
+    <div id="fuel-list"></div>
+  </div>
+  <div id="favs"></div>
+  <div id="bar"><div id="status">Chargement…</div></div>
+</div>
+<div id="sheet"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// No place is hard-coded: the origin is the device location or a start point saved in this browser
+// (right-click / long-press on the map). Without either, the map opens on France.
+const FRANCE = [46.6, 2.4], MIN_LOAD_ZOOM = 11;
+const MIN_RADIUS_KM = 3, MAX_RADIUS_KM = 10;   // query radius follows the visible area, within these bounds
+const DEFAULT_FUELS = ['E10', 'Gazole'];   // until the user picks theirs (the panel opens on first visit)
+const STALE_HOURS = 48;
+
+const OFFICIAL = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2';
+const BRAND_API = 'https://api.prix-carburants.2aaz.fr/station/';
+// logos/<2aaz brand shortName>.png, 96 px, from mon-essence.fr; 'autre' is the unbranded pump.
+const LOGOS = new Set(['auchan', 'autre', 'avia', 'campus', 'carrefour', 'carrefourcontact', 'carrefourexpress',
+  'carrefourmarket', 'dyneff', 'elan', 'eleclerc', 'eni', 'esso', 'essoexpress', 'intercontact', 'intermarche', 'k9',
+  'monoprix', 'netto', 'oilfrance', 'shell', 'simplymarket', 'spar', 'systemeu', 'total', 'totalaccess']);
+
+// Official coordinates are rounded (~100 m) and sometimes wrong (one Esso was 2.4 km off). OSM carries the
+// official id in ref:FR:prix-carburants: positions are fetched from Overpass per TILE-degree tile and cached
+// in localStorage, so each area is only asked once per browser every TILE_TTL_DAYS.
+const TILE = 0.1, TILE_TTL_DAYS = 30;
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter',
+                  'https://overpass.kumi.systems/api/interpreter'];
+// Stations OSM has without the ref tag (checked by hand against the brand's own locator).
+const POSITION_FIXES = { 75014010: [48.820646, 2.324789] };
+// TotalEnergies pictograms (fuels/), colour bar and short label as in the mobile app.
+const FUELS = {
+  E10:    { color: '#9fe3c4', sub: 'E10', label: 'E10' },
+  SP98:   { color: '#2e6b4a', sub: 'E5',  label: 'SP98' },
+  Gazole: { color: '#f5b21b', sub: 'B7',  label: 'Gazole' },
+  E85:    { color: '#c5c3f5', sub: 'E85', label: 'E85' },
+  GPLc:   { color: '#7fb3e6', sub: 'LPG', label: 'GPLc' },
+  SP95:   { color: '#6fcf97', sub: 'E5',  label: 'SP95' },
+};
+const FUEL_ORDER = ['SP98', 'E10', 'Gazole', 'E85', 'GPLc', 'SP95'];
+const PICTOS = ['E10', 'SP98', 'Gazole', 'E85', 'GPLc'];
+const desktop = matchMedia('(min-width: 700px)');
+
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let origin = store.get('start');
+let favorites = store.get('favorites') || [];   // station ids, in the order they were added
+const isFav = id => favorites.includes(id);
+let wanted = store.get('fuels') || DEFAULT_FUELS;   // fuels the user cares about, most preferred first
+
+const map = L.map('map', { zoomControl: false }).setView(origin || FRANCE, origin ? 14 : 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '© OpenStreetMap · prix-carburants.gouv.fr'
+}).addTo(map);
+const stationLayer = L.layerGroup().addTo(map);
+const originMarker = L.marker(origin || FRANCE, { icon: L.divIcon({ className: '', html: '<div class="origin"></div>', iconSize: [18, 18] }), zIndexOffset: 2000 });
+if (store.get('start')) originMarker.addTo(map);
+
+const asList = v => { if (!v) return []; const x = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(x) ? x : [x]; };
+const euro = v => v.toFixed(3).replace('.', ',') + ' €';
+const short = v => v.toFixed(2).replace('.', ',');
+// Feed timestamps carry no timezone: read as local time (Paris).
+const parseMaj = s => new Date(s.replace(' ', 'T'));
+function age(d) {
+  const h = (Date.now() - d) / 36e5;
+  if (h < 1) return `il y a ${Math.max(1, Math.round(h * 60))} min`;
+  if (h < 48) return `il y a ${Math.round(h)} h`;
+  return `il y a ${Math.round(h / 24)} j`;
+}
+const fmtDate = d => d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const title = s => (s || '').toLowerCase().replace(/(^|[\s'’-])\p{L}/gu, c => c.toUpperCase());
+function distKm([a, b], [c, d]) {
+  const r = x => x * Math.PI / 180;
+  const h = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+// Today's opening slots: [[open, close], ...] in minutes, [] if closed, null if not provided.
+function todayHours(r) {
+  let h; try { h = JSON.parse(r.horaires || 'null'); } catch { return null; }
+  const jour = h && asList(h.jour).find(j => +j['@id'] === ((new Date().getDay() + 6) % 7) + 1);
+  if (!jour) return null;
+  if (jour['@ferme'] === '1') return [];
+  const toMin = t => { const [a, b] = t.split('.'); return +a * 60 + +b; };
+  const slots = asList(jour.horaire).map(x => [toMin(x['@ouverture']), toMin(x['@fermeture'])]);
+  return slots.length ? slots : null;
+}
+const hhmm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}`;
+function openState(s) {
+  if (s.automate) return { open: true, pill: '24/24', text: 'Automate 24/24 (déclaré par la station)' };
+  if (!s.hours) return { open: null, pill: 'Caisse', text: 'Pas d’automate déclaré · horaires non renseignés' };
+  const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+  const slot = s.hours.find(([a, b]) => m >= a && m < b);
+  const txt = s.hours.length ? s.hours.map(([a, b]) => `${hhmm(a)}–${hhmm(b)}`).join(', ') : 'fermé aujourd’hui';
+  return { open: !!slot, pill: slot ? 'Ouvert' : 'Fermé', text: `Pas d’automate : passage en caisse · aujourd’hui ${txt}` };
+}
+
+function parseStation(r) {
+  const fuels = {};
+  for (const p of asList(r.prix)) fuels[p['@nom']] = { price: +p['@valeur'], maj: parseMaj(p['@maj']) };
+  for (const x of asList(r.rupture)) {
+    fuels[x['@nom']] = { rupture: true, since: parseMaj(x['@debut']), definitive: x['@type'] === 'definitive' };
+  }
+  const official = [r.geom.lat, r.geom.lon];
+  return { id: r.id, official, tile: tileKey(official), ...placed(r.id, official), adresse: r.adresse, ville: r.ville, cp: r.cp,
+           automate: r.horaires_automate_24_24 === 'Oui', hours: todayHours(r), fuels };
+}
+const available = s => wanted.filter(n => s.fuels[n] && !s.fuels[n].rupture);
+
+// 2aaz: brand + name (cached), and the status of wanted fuels the official feed is silent about.
+const EXTRA_FUELS = { Gazole: 'Gazole', SP95: 'SP95', 'SP95-E10': 'E10', SP98: 'SP98', E85: 'E85', GPLc: 'GPLc' };
+const parseText = t => { const [d, h] = t.split(' '); const [dd, mm, yy] = d.split('/'); return parseMaj(`${yy}-${mm}-${dd} ${h}`); };
+async function enrich(s, cache) {
+  if (cache[s.id] && wanted.every(n => s.fuels[n])) return Object.assign(s, cache[s.id]);
+  let d;
+  try { d = await (await fetch(BRAND_API + s.id)).json(); } catch { Object.assign(s, cache[s.id] || {}); return; }
+  Object.assign(s, cache[s.id] = { short: d.Brand?.shortName, brand: d.Brand?.name, name: d.name });
+  for (const f of d.Fuels || []) {
+    const n = EXTRA_FUELS[f.shortName];
+    if (!n || s.fuels[n]) continue;
+    const maj = parseText(f.Update.text);
+    s.fuels[n] = f.available ? { price: f.Price.value, maj, via2aaz: true }
+                             : { rupture: true, since: maj, last: f.Price?.value, via2aaz: true };
+  }
+}
+
+function logoHtml(s) {
+  const file = LOGOS.has(s.short) ? s.short : !s.brand || s.short === 'autre' ? 'autre' : null;
+  return file ? `<img src="logos/${file}.png" alt="">` : `<span class="initials">${s.brand.slice(0, 3).toUpperCase()}</span>`;
+}
+
+// Price rank in [0, 1] (0 = cheapest) of the station's preferred fuel (SP98, else E10) among the
+// stations selling that fuel; null when neither is buyable right now.
+function priceRank(s, all) {
+  if (openState(s).open === false) return null;
+  const n = available(s)[0];
+  if (!n) return null;
+  const prices = all.map(x => x.fuels[n]).filter(f => f && !f.rupture).map(f => f.price).sort((a, b) => a - b);
+  return prices.length > 1 ? prices.findIndex(p => p >= s.fuels[n].price) / (prices.length - 1) : 0;
+}
+
+// Cheaper stations get bigger, opaque pins; dearer ones shrink and fade; unbuyable ones are small grey dots.
+function pinStyle(s, rank) {
+  const fav = isFav(s.id);
+  if (rank === null) return { size: fav ? 34 : 24, opacity: fav ? .8 : .45, z: fav ? 1000 : 0 };
+  const size = Math.round(52 - 26 * rank);
+  return { size: fav ? Math.max(size, 40) : size, opacity: fav ? 1 : 1 - .5 * rank, z: Math.round(500 * (1 - rank)) + (fav ? 1000 : 0) };
+}
+
+function pinHtml(s, rank, st) {
+  const ok = available(s);
+  const tag = rank === null ? (isFav(s.id) ? `<span class="tag ko">${ok.length ? 'fermé' : 'rupture'}</span>` : '')
+            : `<span class="tag">${ok.slice(0, 2).map(n => `${n} ${short(s.fuels[n].price)}`).join(' · ')}</span>`;
+  return `<div class="marker-wrap" style="opacity:${st.opacity}"><div class="pin ${rank === null ? 'ko' : ''} ${isFav(s.id) ? 'fav' : ''}"
+    style="--s:${st.size};width:${st.size}px;height:${st.size}px">${logoHtml(s)}</div>${isFav(s.id) ? '<span class="star">⭐</span>' : ''}${tag}</div>`;
+}
+
+function fuelRow(n, f) {
+  const meta = FUELS[n] || { color: '#999', sub: '', label: n };
+  const picto = PICTOS.includes(n) ? `<img src="fuels/${n}.png" alt="">` : '<span></span>';
+  const src = f.via2aaz ? ' · via 2aaz' : '';
+  let val;
+  if (f.rupture) {
+    val = `<span class="na">${f.definitive ? 'Plus vendu' : 'Indisponible'}</span>
+      <span class="when">depuis le ${fmtDate(f.since)}${f.last ? ` · dernier prix ${euro(f.last)}` : ''}${src}</span>`;
+  } else {
+    const stale = (Date.now() - f.maj) / 36e5 > STALE_HOURS;
+    val = `<span class="price">${euro(f.price)}</span>
+      <span class="when ${stale ? 'stale' : ''}">Déclaré ${age(f.maj)} · ${fmtDate(f.maj)}${src}</span>`;
+  }
+  return `<div class="fuel"><span class="bar" style="background:${meta.color}"></span>${picto}
+    <span class="name">${meta.label}<small>${meta.sub}</small></span><span class="val">${val}</span></div>`;
+}
+
+function cardHtml(s) {
+  const o = openState(s);
+  const rows = FUEL_ORDER.filter(n => s.fuels[n] && (wanted.includes(n) || !s.fuels[n].rupture))
+    .map(n => fuelRow(n, s.fuels[n])).join('');
+  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  // total-codes.json is matched by distance, so only trust it for stations 2aaz also labels TotalEnergies.
+  const te = s.short?.startsWith('total') && totalCodes[s.id];
+  return `
+    <div class="sh-head">
+      <div class="sh-logo">${logoHtml(s)}</div>
+      <div>
+        <h2>${title(s.name) || s.brand || 'Station'}</h2>
+        <div class="addr">${title(s.adresse)}<br>${s.cp} ${title(s.ville)}</div>
+        <div class="meta">${origin ? `${distKm(origin, s.pos).toFixed(1).replace('.', ',')} km à vol d’oiseau` : ''}
+          <span class="pill ${{ true: 'ok', false: 'ko' }[o.open] || ''}">${o.pill}</span></div>
+      </div>
+      <div class="sh-actions">
+        <button class="sh-close" aria-label="Fermer">✕</button>
+        <button class="sh-fav ${isFav(s.id) ? 'on' : ''}" aria-label="Favori">${isFav(s.id) ? '★' : '☆'}</button>
+      </div>
+      <a class="go" href="https://maps.apple.com/?daddr=${s.pos}" target="_blank">Y aller ›</a>
+    </div>
+    <div class="sh-body">
+      <div class="sec">Carburants au ${today}</div>
+      ${rows || '<div class="info">Aucun carburant déclaré.</div>'}
+      <div class="sec">Accès</div>
+      <div class="info ${{ true: 'ok', false: 'ko' }[o.open] || ''}">${o.text}</div>
+      <div class="info">${s.brand || ''} · id ${s.id} · position ${s.posOsm ? 'OpenStreetMap' : 'officielle (±100 m)'}</div>
+      <div class="links">
+        <a href="https://www.prix-carburants.gouv.fr/station/${s.id}" target="_blank">Fiche prix-carburants.gouv.fr ↗</a>
+        ${te ? `<a href="https://locator.totalenergies.com/${te}?type=FUELING&business_type=RETAIL" target="_blank">Fiche TotalEnergies ↗</a>` : ''}
+      </div>
+    </div>`;
+}
+
+const sheet = document.getElementById('sheet');
+function closeCard() { sheet.classList.remove('open'); map.closePopup(); }
+function showStation(s, zoom = map.getZoom()) {
+  if (desktop.matches) {
+    map.setView(s.pos, zoom, { animate: false });
+    const popup = L.popup({ className: 'st-pop', closeButton: false, maxWidth: 360, minWidth: 360, offset: [0, -18],
+                            autoPanPaddingTopLeft: [20, 150], autoPanPaddingBottomRight: [20, 70] })
+      .setLatLng(s.pos).setContent(cardHtml(s)).openOn(map);
+    // Not document.querySelector: the previous popup is still in the DOM while it fades out.
+    wireCard(popup.getElement(), s);
+    return;
+  }
+  sheet.innerHTML = cardHtml(s);
+  wireCard(sheet, s);
+  sheet.scrollTop = 0;
+  sheet.classList.add('open');
+  // Keep the pin in the part of the map the sheet leaves visible.
+  map.setView(s.pos, zoom, { animate: false });
+  map.panBy([0, sheet.offsetHeight / 2], { animate: false });
+}
+map.on('click', () => sheet.classList.remove('open'));
+
+function wireCard(root, s) {
+  root.querySelector('.sh-close').onclick = closeCard;
+  const btn = root.querySelector('.sh-fav');
+  btn.onclick = () => {
+    favorites = isFav(s.id) ? favorites.filter(id => id !== s.id) : [...favorites, s.id];
+    store.set('favorites', favorites);
+    btn.classList.toggle('on', isFav(s.id));
+    btn.textContent = isFav(s.id) ? '★' : '☆';
+    render();
+  };
+}
+
+function favCard(s) {
+  const cell = n => { const f = s.fuels[n];
+    if (!f) return `<span>${n} —</span>`;
+    return f.rupture ? `<span class="ko">${n} ✕</span>` : `<span class="ok">${n} ${short(f.price)}</span>`; };
+  const b = document.createElement('button');
+  b.className = 'fav-card';
+  b.innerHTML = `<b>⭐ ${title(s.ville)}</b><div class="fuels">${wanted.slice(0, 3).map(cell).join('')}${openState(s).open === false ? '<span class="ko">fermé</span>' : ''}</div>`;
+  b.onclick = () => showStation(s, 16);
+  return b;
+}
+
+let totalCodes = {}, stations = [];
+
+let osmTiles = store.get('osmTiles') || {};   // tile key -> { t: fetched at, p: { station id: [lat, lon] } }
+const tileKey = ([lat, lon]) => `${Math.floor(lat / TILE)},${Math.floor(lon / TILE)}`;
+function placed(id, official) {
+  const pos = POSITION_FIXES[id] || osmTiles[tileKey(official)]?.p[id];
+  return { pos: pos || official, posOsm: !!pos };
+}
+
+async function fetchTile(key) {
+  const [a, b] = key.split(',').map(Number);
+  const bbox = [a * TILE, b * TILE, (a + 1) * TILE, (b + 1) * TILE].map(x => x.toFixed(4)).join(',');
+  const data = `[out:json][timeout:25];nwr["amenity"="fuel"]["ref:FR:prix-carburants"](${bbox});out center tags;`;
+  for (const url of OVERPASS) {
+    try {
+      const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data }) });
+      if (!r.ok) continue;
+      const p = {};
+      for (const e of (await r.json()).elements) {
+        const c = e.center || e;
+        for (const ref of e.tags['ref:FR:prix-carburants'].split(';')) p[ref.trim()] = [c.lat, c.lon];
+      }
+      return p;
+    } catch {}
+  }
+  return null;   // every mirror failed: keep official positions, retry on the next load
+}
+
+// Fetch missing tiles one at a time (gentle on Overpass), then move the pins. A call made while a run is
+// in progress is queued, since the stations (hence the tiles needed) may have changed meanwhile.
+let refining = false, refineAgain = false;
+async function refinePositions() {
+  if (refining) { refineAgain = true; return; }
+  refining = true;
+  const fresh = k => osmTiles[k] && Date.now() - osmTiles[k].t < TILE_TTL_DAYS * 864e5;
+  const failed = new Set();
+  let k;
+  while ((k = [...new Set(stations.map(s => s.tile))].find(k => !fresh(k) && !failed.has(k)))) {
+    const p = await fetchTile(k);
+    if (!p) { failed.add(k); continue; }
+    osmTiles[k] = { t: Date.now(), p };
+    store.set('osmTiles', osmTiles);
+    for (const s of stations) Object.assign(s, placed(s.id, s.official));
+    render();
+  }
+  refining = false;
+  if (refineAgain) { refineAgain = false; refinePositions(); }
+}
+const brandCache = store.get('brands') || {};
+
+let loaded = null, loadSeq = 0;   // last query centre and radius; sequence number to drop stale responses
+const viewRadiusKm = () => { const b = map.getBounds(); return distKm([b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]) / 2; };
+
+async function loadStations(center = map.getCenter()) {
+  const status = document.getElementById('status');
+  const seq = ++loadSeq;
+  const c = Array.isArray(center) ? center : [center.lat, center.lng];
+  const radius = Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, viewRadiusKm()));
+  status.textContent = 'Chargement…';
+  try {
+    // The 100 stations nearest the view centre, plus favourites by id wherever they are.
+    const point = `geom'POINT(${c[1]} ${c[0]})'`;
+    const near = `within_distance(geom, ${point}, ${radius.toFixed(1)}km)`;
+    const where = encodeURIComponent(favorites.length ? `${near} OR id IN (${favorites.join(',')})` : near);
+    const [data, meta] = await Promise.all([
+      fetch(`${OFFICIAL}/records?where=${where}&order_by=${encodeURIComponent(`distance(geom, ${point})`)}&limit=100`).then(r => r.json()),
+      fetch(OFFICIAL).then(r => r.json()),
+    ]);
+    const next = data.results.map(parseStation);
+    await Promise.all(next.map(s => enrich(s, brandCache)));
+    if (seq !== loadSeq) return;
+    store.set('brands', brandCache);
+    stations = next;
+    loaded = { center: c, radius };
+
+    render();
+
+    const processed = new Date(meta.metas.default.data_processed);
+    status.textContent = `${stations.length} stations · flux officiel ${age(processed)} (${fmtDate(processed)}) · plus le pin est gros, moins c’est cher`;
+    refinePositions();
+  } catch (e) {
+    status.textContent = 'Erreur de chargement : ' + e.message;
+  }
+}
+
+function render() {
+  stationLayer.clearLayers();
+  for (const s of stations) {
+    const rank = priceRank(s, stations), st = pinStyle(s, rank);
+    const icon = L.divIcon({ className: '', html: pinHtml(s, rank, st), iconSize: [st.size, st.size] });
+    L.marker(s.pos, { icon, zIndexOffset: st.z }).on('click', () => showStation(s)).addTo(stationLayer);
+  }
+  const cards = favorites.map(id => stations.find(x => x.id === id)).filter(Boolean).map(favCard);
+  if (!cards.length) {
+    const hint = document.createElement('div');
+    hint.className = 'fav-card hint';
+    hint.textContent = 'Aucun favori : ouvrez une station et touchez ☆ pour l’ajouter ici.';
+    cards.push(hint);
+  }
+  document.getElementById('favs').replaceChildren(...cards);
+}
+
+function setOrigin(pos, save) {
+  origin = pos;
+  if (save) store.set('start', pos);
+  originMarker.setLatLng(pos).addTo(map);
+  map.setView(pos, 14);
+  loadStations(pos);
+}
+
+// Reload when the view leaves the loaded area: centre moved far enough, or zoomed out past it.
+let moveTimer;
+map.on('moveend', () => {
+  clearTimeout(moveTimer);
+  moveTimer = setTimeout(() => {
+    if (map.getZoom() < MIN_LOAD_ZOOM) {
+      if (!loaded) document.getElementById('status').textContent = 'Zoomez sur une zone ou touchez « Autour de moi »';
+      return;
+    }
+    const c = map.getCenter();
+    if (!loaded) return loadStations(c);
+    const moved = distKm(loaded.center, [c.lat, c.lng]);
+    if (moved > loaded.radius * .4 || viewRadiusKm() > loaded.radius * 1.1 && loaded.radius < MAX_RADIUS_KM) loadStations(c);
+  }, 400);
+});
+
+document.getElementById('locate').onclick = () => {
+  const status = document.getElementById('status');
+  if (!navigator.geolocation) { status.textContent = 'Géolocalisation non disponible'; return; }
+  status.textContent = 'Localisation…';
+  navigator.geolocation.getCurrentPosition(
+    p => setOrigin([p.coords.latitude, p.coords.longitude], false),
+    e => { status.textContent = window.isSecureContext ? `Localisation refusée : ${e.message}`
+                                                       : 'Localisation impossible : la page doit être servie en https'; },
+    { enableHighAccuracy: true, timeout: 10000 });
+};
+// Right-click (desktop) or long-press (mobile): save a start point in this browser only.
+map.on('contextmenu', e => {
+  if (confirm('Enregistrer ce point comme départ, dans ce navigateur uniquement ?')) setOrigin([e.latlng.lat, e.latlng.lng], true);
+});
+
+// Fuel preferences: checked fuels in preference order, then the others.
+const ALL_FUELS = ['SP98', 'E10', 'SP95', 'Gazole', 'E85', 'GPLc'];
+function renderPrefs() {
+  const list = document.getElementById('fuel-list');
+  list.replaceChildren(...[...wanted, ...ALL_FUELS.filter(n => !wanted.includes(n))].map(n => {
+    const i = wanted.indexOf(n);
+    const row = document.createElement('label');
+    row.className = 'fuel-opt';
+    row.innerHTML = `<input type="checkbox" ${i >= 0 ? 'checked' : ''}>
+      ${PICTOS.includes(n) ? `<img src="fuels/${n}.png" alt="">` : '<span></span>'}
+      <span>${n}${i >= 0 ? `<span class="rank">n° ${i + 1}</span>` : ''}</span>
+      ${i > 0 ? '<button class="up" title="Monter">↑</button>' : '<span></span>'}`;
+    row.querySelector('input').onchange = e => setFuels(e.target.checked ? [...wanted, n] : wanted.filter(x => x !== n));
+    const up = row.querySelector('.up');
+    if (up) up.onclick = e => { e.preventDefault(); const w = [...wanted]; [w[i - 1], w[i]] = [w[i], w[i - 1]]; setFuels(w); };
+    return row;
+  }));
+}
+function setFuels(list) {
+  if (!list.length) { renderPrefs(); return; }   // keep at least one fuel
+  wanted = list;
+  store.set('fuels', wanted);
+  renderPrefs();
+  if (loaded) loadStations(map.getCenter());   // 2aaz may know statuses of newly wanted fuels
+}
+const prefs = document.getElementById('prefs');
+document.getElementById('prefs-btn').onclick = () => { prefs.hidden = !prefs.hidden; renderPrefs(); };
+
+// Search: Base Adresse Nationale (city, postcode or full address), zoom according to what was found.
+const ZOOM_BY_TYPE = { municipality: 13, locality: 15, street: 16, housenumber: 17 };
+const q = document.getElementById('q'), results = document.getElementById('results');
+const searchMarker = L.circleMarker([0, 0], { radius: 8, color: '#2d7cf6', weight: 3, fillOpacity: .2 });
+let searchTimer, hits = [];
+function pick(f) {
+  const [lon, lat] = f.geometry.coordinates, t = f.properties.type;
+  q.value = f.properties.label;
+  results.replaceChildren();
+  prefs.hidden = true;
+  q.blur();
+  map.setView([lat, lon], ZOOM_BY_TYPE[t] || 14);
+  if (t === 'housenumber' || t === 'street') searchMarker.setLatLng([lat, lon]).addTo(map); else searchMarker.remove();
+}
+q.oninput = () => {
+  clearTimeout(searchTimer);
+  const text = q.value.trim();
+  if (text.length < 3) { results.replaceChildren(); return; }
+  searchTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(text)}&limit=5&autocomplete=1`);
+      hits = (await r.json()).features;
+    } catch { hits = []; }
+    if (q.value.trim() !== text) return;
+    results.replaceChildren(...hits.map(f => {
+      const b = document.createElement('button');
+      b.innerHTML = `${f.properties.label}${f.properties.type === 'municipality' ? `<small>${f.properties.postcode}</small>` : ''}`;
+      b.onclick = () => pick(f);
+      return b;
+    }));
+  }, 250);
+};
+map.on('click', () => { results.replaceChildren(); prefs.hidden = true; });
+q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key === 'Escape') results.replaceChildren(); };
+
+(async () => {
+  if (!store.get('fuels')) { prefs.hidden = false; renderPrefs(); }
+  totalCodes = await fetch('total-codes.json').then(r => r.json()).catch(() => ({}));
+  if (origin) return loadStations(origin);
+  document.getElementById('status').textContent = 'Zoomez sur une zone ou touchez « Autour de moi »';
+  // Locate straight away only if the browser already allowed it; otherwise wait for the button.
+  const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
+  if (perm?.state === 'granted') document.getElementById('locate').click();
+})();
+</script>
+</body>
+</html>
