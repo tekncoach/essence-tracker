@@ -622,7 +622,8 @@ async function loadStations(center = map.getCenter()) {
     // The 100 stations nearest the view centre, plus favourites by id wherever they are.
     const point = `geom'POINT(${c[1]} ${c[0]})'`;
     const near = `within_distance(geom, ${point}, ${radius.toFixed(1)}km)`;
-    const where = encodeURIComponent(favorites.length ? `${near} OR id IN (${favorites.join(',')})` : near);
+    const ids = [...favorites, pendingStation].filter(Boolean);
+    const where = encodeURIComponent(ids.length ? `${near} OR id IN (${ids.join(',')})` : near);
     const [data, meta] = await Promise.all([
       fetch(`${OFFICIAL}/records?where=${where}&order_by=${encodeURIComponent(`distance(geom, ${point})`)}&limit=100`).then(r => r.json()),
       fetch(OFFICIAL).then(r => r.json()),
@@ -635,6 +636,11 @@ async function loadStations(center = map.getCenter()) {
     loaded = { center: c, radius };
 
     render();
+    if (pendingStation) {
+      const s = stations.find(x => x.id === pendingStation);
+      pendingStation = null;
+      if (s) showStation(s);
+    }
 
     const processed = new Date(meta.metas.default.data_processed);
     setStatus(`${stations.length} stations · flux officiel ${age(processed)} (${fmtDate(processed)})`);
@@ -913,6 +919,10 @@ new MutationObserver(() => {
   })));
 }).observe(sheet, { childList: true });
 
+// ?station=<id> (a notification links there) opens that station's card once it is loaded, wherever it is.
+let pendingStation = +new URLSearchParams(location.search).get('station') || null;
+if (pendingStation) history.replaceState(null, '', location.pathname);
+
 (async () => {
   // Mobile: the list sheet hangs off the page, not the top bar (below it, so the fuel panel opens over the list).
   if (!desktop.matches) { document.body.appendChild(listBox); listBox.hidden = false; }
@@ -933,7 +943,7 @@ new MutationObserver(() => {
   // Locate straight away once « Autour de moi » has worked here before: an installed iOS app may not report the
   // permission as granted between launches, so the browser's answer alone is not enough.
   const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-  if (store.get('autoLocate') || perm?.state === 'granted') document.getElementById('locate').click();
+  if (!pendingStation && (store.get('autoLocate') || perm?.state === 'granted')) document.getElementById('locate').click();
 })();
 </script>
 </body>
