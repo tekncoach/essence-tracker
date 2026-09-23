@@ -1,4 +1,4 @@
-# essence-tracker
+﻿# essence-tracker
 
 [![Site](https://img.shields.io/badge/site-tekncoach.github.io%2Fessence--tracker-f08a3c)](https://tekncoach.github.io/essence-tracker/)
 [![Déploiement](https://github.com/tekncoach/essence-tracker/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/tekncoach/essence-tracker/actions/workflows/pages/pages-build-deployment)
@@ -6,7 +6,7 @@
 [![Données](https://img.shields.io/badge/données-prix--carburants.gouv.fr-000091)](https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/)
 ![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)
 
-Carte des stations-service françaises avec le prix, la fraîcheur et la disponibilité de chaque carburant. Page statique, sans serveur ni compte : tout tourne dans le navigateur, et les réglages de chaque utilisateur (carburants préférés, favoris, point de départ) restent dans son `localStorage`.
+Carte des stations-service françaises avec le prix, la fraîcheur et la disponibilité de chaque carburant. Page statique, sans compte : tout tourne dans le navigateur, et les réglages de chaque utilisateur (carburants préférés, favoris, point de départ) restent dans son `localStorage`. Seules les alertes de retour d'un carburant passent par un petit service, un Worker Cloudflare (`worker/`).
 
 ## Fonctionnalités
 
@@ -16,6 +16,7 @@ Carte des stations-service françaises avec le prix, la fraîcheur et la disponi
 - Vue en liste des stations visibles, triée par prix ou par distance.
 - Carburants préférés dans l'ordre choisi, favoris, point de départ (clic droit ou appui long sur la carte).
 - Installable comme une app (PWA).
+- Alerte de retour d'un carburant indisponible dans une station : notification push quand il revient, vérifiée chaque heure, à usage unique, valable 7 jours. Sur iPhone, l'app doit être installée sur l'écran d'accueil.
 
 ## Sources de données
 
@@ -45,6 +46,20 @@ TE_WOOSMAP_KEY=woos-… python3 scripts/update_total_codes.py      # total-codes
 ```
 
 `TE_WOOSMAP_KEY` est la clé publique que le front de locator.totalenergies.com envoie à api.woosmap.com (onglet réseau du navigateur). Elle n'est pas versionnée.
+
+## Alertes (`worker/`)
+
+Un Worker Cloudflare enregistre les alertes (station, carburant, abonnement Web Push) dans un espace KV, interroge chaque heure le flux officiel (complété par 2aaz quand le flux ne dit rien du carburant), envoie une notification pour chaque carburant revenu et supprime l'alerte. Web Push est implémenté en WebCrypto (`worker/src/push.js`).
+
+```sh
+cd worker
+npm install
+npm test                 # chiffrement et signature VAPID contre l'implémentation de référence
+npm run dev              # Worker local ; vérification horaire déclenchée par /cdn-cgi/local/scheduled
+npm run deploy
+```
+
+La clé privée VAPID est un secret du Worker (`wrangler secret put VAPID_PRIVATE_JWK`) et, en local, dans `worker/.dev.vars`, non versionné. La clé publique est dans `worker/wrangler.jsonc` et `index.html`.
 
 ## Crédits
 
