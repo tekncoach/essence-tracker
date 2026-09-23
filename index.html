@@ -282,14 +282,35 @@ function parseStation(r) {
 }
 const available = s => wanted.filter(n => s.fuels[n] && !s.fuels[n].rupture);
 
-// 2aaz: brand + name (cached), and the status of wanted fuels the official feed is silent about.
+// Brand and station name: brands/<département>.json where pre-built (scripts/update_brands.py), else this
+// browser's cache, else 2aaz once per station (the answer is then cached; brands rarely change).
+const zoneOf = id => { const s = String(id); return s.startsWith('97') ? s.slice(0, 3) : s.slice(0, 2); };
+const brandZones = {};   // département -> Promise of { id: [shortName, name] } ({} when not pre-built)
+const brandCache = store.get('brandCache') || {};
+let brandNames = {};
+const setBrand = (s, [short, name] = []) => Object.assign(s, { short, name, brand: brandNames[short] || short });
+async function applyBrands(list) {
+  for (const z of new Set(list.map(s => zoneOf(s.id))))
+    brandZones[z] ??= fetch(`brands/${z}.json`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  const unknown = [];
+  for (const s of list) {
+    const known = (await brandZones[zoneOf(s.id)])[s.id] || brandCache[s.id];
+    if (known) setBrand(s, known); else unknown.push(s);
+  }
+  await Promise.all(unknown.map(enrich));
+  if (unknown.length) store.set('brandCache', brandCache);
+}
+
+// 2aaz, per station, only for favourites and an opened card: the status of wanted fuels the official
+// feed is silent about (it sometimes drops a fuel in rupture altogether).
 const EXTRA_FUELS = { Gazole: 'Gazole', SP95: 'SP95', 'SP95-E10': 'E10', SP98: 'SP98', E85: 'E85', GPLc: 'GPLc' };
 const parseText = t => { const [d, h] = t.split(' '); const [dd, mm, yy] = d.split('/'); return parseMaj(`${yy}-${mm}-${dd} ${h}`); };
-async function enrich(s, cache) {
-  if (cache[s.id] && wanted.every(n => s.fuels[n])) return Object.assign(s, cache[s.id]);
+async function enrich(s) {
+  if (s.enriched || s.short !== undefined && wanted.every(n => s.fuels[n])) return false;
   let d;
-  try { d = await (await fetch(BRAND_API + s.id)).json(); } catch { Object.assign(s, cache[s.id] || {}); return; }
-  Object.assign(s, cache[s.id] = { short: d.Brand?.shortName, brand: d.Brand?.name, name: d.name });
+  try { d = await (await fetch(BRAND_API + s.id)).json(); } catch { return false; }
+  s.enriched = true;
+  if (!s.short) setBrand(s, brandCache[s.id] = [d.Brand?.shortName, d.name]);
   for (const f of d.Fuels || []) {
     const n = EXTRA_FUELS[f.shortName];
     if (!n || s.fuels[n]) continue;
@@ -297,6 +318,7 @@ async function enrich(s, cache) {
     s.fuels[n] = f.available ? { price: f.Price.value, maj, via2aaz: true }
                              : { rupture: true, since: maj, last: f.Price?.value, via2aaz: true };
   }
+  return true;
 }
 
 function logoHtml(s) {
@@ -383,8 +405,11 @@ function cardHtml(s) {
 }
 
 const sheet = document.getElementById('sheet');
-function closeCard() { sheet.classList.remove('open'); map.closePopup(); }
+let current = null;   // station whose card is open
+function closeCard() { current = null; sheet.classList.remove('open'); map.closePopup(); }
 function showStation(s, zoom = map.getZoom()) {
+  enrich(s).then(changed => { if (changed && current === s) { render(); showStation(s); } });
+  current = s;
   if (desktop.matches) {
     map.setView(s.pos, zoom, { animate: false });
     const popup = L.popup({ className: 'st-pop', closeButton: false, maxWidth: 360, minWidth: 360, offset: [0, -18],
@@ -475,7 +500,7 @@ async function refinePositions() {
   refining = false;
   if (refineAgain) { refineAgain = false; refinePositions(); }
 }
-const brandCache = store.get('brands') || {};
+try { localStorage.removeItem('brands'); } catch {}   // brand cache format of earlier versions
 
 let loaded = null, loadSeq = 0;   // last query centre and radius; sequence number to drop stale responses
 const viewRadiusKm = () => { const b = map.getBounds(); return distKm([b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]) / 2; };
@@ -496,9 +521,9 @@ async function loadStations(center = map.getCenter()) {
       fetch(OFFICIAL).then(r => r.json()),
     ]);
     const next = data.results.map(parseStation);
-    await Promise.all(next.map(s => enrich(s, brandCache)));
+    await applyBrands(next);
+    await Promise.all(next.filter(s => isFav(s.id)).map(enrich));
     if (seq !== loadSeq) return;
-    store.set('brands', brandCache);
     stations = next;
     loaded = { center: c, radius };
 
@@ -529,6 +554,7 @@ function render() {
   document.getElementById('favs').replaceChildren(...cards);
   renderList();
 }
+
 // List of the stations in view: by price (grouped by the preferred fuel each one is ranked on) or by distance.
 let listSort = 'price';
 function renderList() {
@@ -569,7 +595,6 @@ document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
   renderList();
 });
 map.on('moveend', renderList);
-
 
 function setOrigin(pos, save) {
   origin = pos;
@@ -682,7 +707,8 @@ q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key 
     hint.hidden = false;
     hint.querySelector('button').onclick = () => { hint.hidden = true; store.set('installHintSeen', true); };
   }
-  totalCodes = await fetch('total-codes.json').then(r => r.json()).catch(() => ({}));
+  [totalCodes, brandNames] = await Promise.all(['total-codes.json', 'brands/names.json']
+    .map(f => fetch(f).then(r => r.json()).catch(() => ({}))));
   if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (origin) return loadStations(origin);
   document.getElementById('status').textContent = 'Zoomez sur une zone ou touchez « Autour de moi »';
