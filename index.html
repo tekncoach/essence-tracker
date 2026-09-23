@@ -79,6 +79,7 @@
   .list-foot { padding: 6px 12px; font-size: 11px; color: var(--muted); }
   #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
   #install button { float: right; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+  .fuel-opt .sub { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 5px; }
   .fuel-opt .rank { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
   #status, .btn { background: var(--card); color: var(--muted); font: inherit; font-size: 12px; padding: 4px 8px;
     border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.15); border: 0; }
@@ -204,10 +205,10 @@ const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.p
 const POSITION_FIXES = { 75014010: [48.820646, 2.324789] };
 // TotalEnergies pictograms (fuels/), colour bar and short label as in the mobile app.
 const FUELS = {
-  E10:    { color: '#9fe3c4', sub: 'E10', label: 'E10' },
+  E10:    { color: '#9fe3c4', sub: 'SP95-E10', label: 'E10' },
   SP98:   { color: '#2e6b4a', sub: 'E5',  label: 'SP98' },
   Gazole: { color: '#f5b21b', sub: 'B7',  label: 'Gazole' },
-  E85:    { color: '#c5c3f5', sub: 'E85', label: 'E85' },
+  E85:    { color: '#c5c3f5', sub: 'Superéthanol', label: 'E85' },
   GPLc:   { color: '#7fb3e6', sub: 'LPG', label: 'GPLc' },
   SP95:   { color: '#6fcf97', sub: 'E5',  label: 'SP95' },
 };
@@ -646,7 +647,7 @@ function renderPrefs() {
     row.className = 'fuel-opt';
     row.innerHTML = `<input type="checkbox" ${i >= 0 ? 'checked' : ''}>
       ${PICTOS.includes(n) ? `<img src="fuels/${n}.png" alt="">` : '<span></span>'}
-      <span>${n}${i >= 0 ? `<span class="rank">n° ${i + 1}</span>` : ''}</span>
+      <span>${n}<small class="sub">${FUELS[n].sub}</small>${i >= 0 ? `<span class="rank">n° ${i + 1}</span>` : ''}</span>
       ${i > 0 ? '<button class="up" title="Monter">↑</button>' : '<span></span>'}`;
     row.querySelector('input').onchange = e => setFuels(e.target.checked ? [...wanted, n] : wanted.filter(x => x !== n));
     const up = row.querySelector('.up');
