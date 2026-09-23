@@ -851,7 +851,12 @@ function drag(handles, { start, move, end }) {
 // Folded = handle + header, down to the bottom of the screen.
 const listPeek = () => listBox.querySelector('.grab-wrap').offsetHeight + listBox.querySelector('.list-head').offsetHeight
   + parseFloat(getComputedStyle(listBox).paddingBottom);
-const listSnaps = () => { const h = document.body.clientHeight; return [listPeek(), h * .45, h - 70]; };   // page height: the whole screen once stretched
+// Heights against the page (the whole screen once stretched); fully open stops below the search/locate buttons, clear
+// of the status bar, so its handle stays easy to grab.
+const listSnaps = () => {
+  const h = document.body.clientHeight, top = document.getElementById('tools').getBoundingClientRect().bottom + 12;
+  return [listPeek(), h * .45, h - top];
+};
 let listStartH;
 function setListHeight(h) {
   listBox.style.height = `${h}px`;
