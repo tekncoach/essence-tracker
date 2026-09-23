@@ -116,6 +116,7 @@
     #tools { justify-content: flex-end; }
     #search-btn { display: grid; }
     #tools:not(.searching) .search { display: none; }   /* search folded behind a button: rarely needed on the go */
+    #q { font-size: 16px; }   /* below 16px, iOS zooms the page in on focus */
     #list { transition: transform .25s ease; }
     #list.away { transform: translateY(110%); }   /* hidden while a station card is open, height kept */
     #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh; max-height: none;
