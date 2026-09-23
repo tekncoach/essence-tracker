@@ -149,6 +149,11 @@
   .pin.ko { border-color: var(--ko); filter: grayscale(.7); opacity: .75; }
   .pin img { width: calc(var(--s) * .7px); height: calc(var(--s) * .7px); }
   .pin.fav { border-width: 4px; }
+  .pin.sel { border: 4px solid var(--accent); filter: none; animation: selpulse 1.6s ease-out infinite; }
+  @keyframes selpulse {
+    from { box-shadow: 0 0 0 0 rgba(240,138,60,.7), 0 1px 5px rgba(0,0,0,.35); }
+    to { box-shadow: 0 0 0 16px rgba(240,138,60,0), 0 1px 5px rgba(0,0,0,.35); }
+  }
   .fav-card.hint { grid-column: 1 / -1; color: var(--muted); font-size: 12px; cursor: default; max-width: 340px; }
   .star { position: absolute; top: -6px; right: -6px; font-size: 16px; text-shadow: 0 0 3px #fff; }
   .tag { position: absolute; top: 100%; left: 50%; transform: translate(-50%, 3px); white-space: nowrap;
@@ -407,7 +412,9 @@ function priceRank(s, all) {
 }
 
 // Cheaper stations get bigger, opaque pins; dearer ones shrink and fade; unbuyable ones are small grey dots.
+// The station whose card is open overrides all that: full size and opacity, on top of everything.
 function pinStyle(s, rank) {
+  if (current?.id === s.id) return { size: 54, opacity: 1, z: 5000 };
   const fav = isFav(s.id);
   if (rank === null) return { size: fav ? 34 : 24, opacity: fav ? .8 : .45, z: fav ? 1000 : 0 };
   const size = Math.round(52 - 26 * rank);
@@ -415,10 +422,10 @@ function pinStyle(s, rank) {
 }
 
 function pinHtml(s, rank, st) {
-  const ok = available(s);
-  const tag = rank === null ? (isFav(s.id) ? `<span class="tag ko">${ok.length ? 'fermé' : 'rupture'}</span>` : '')
+  const ok = available(s), sel = current?.id === s.id;
+  const tag = rank === null ? (isFav(s.id) || sel ? `<span class="tag ko">${ok.length ? 'fermé' : 'rupture'}</span>` : '')
             : `<span class="tag">${ok.slice(0, 2).map(n => `${n} ${short(s.fuels[n].price)}`).join(' · ')}</span>`;
-  return `<div class="marker-wrap" style="opacity:${st.opacity}"><div class="pin ${rank === null ? 'ko' : ''} ${isFav(s.id) ? 'fav' : ''}"
+  return `<div class="marker-wrap" style="opacity:${st.opacity}"><div class="pin ${rank === null ? 'ko' : ''} ${isFav(s.id) ? 'fav' : ''} ${sel ? 'sel' : ''}"
     style="--s:${st.size};width:${st.size}px;height:${st.size}px">${logoHtml(s)}</div>${isFav(s.id) ? '<span class="star">⭐</span>' : ''}${tag}</div>`;
 }
 
@@ -486,16 +493,22 @@ const sheet = document.getElementById('sheet');
 let current = null;   // station whose card is open
 function closeCard() {
   current = null;
+  render();   // the pin drops its selected look
   sheet.classList.remove('open');
   map.closePopup();
   listBox.classList.remove('away');   // the list comes back at the height it had
 }
-function showStation(s, zoom = map.getZoom()) {
+// Selecting a station zooms in to street level (never out) and highlights its pin while the card is open.
+const SELECT_ZOOM = 15;
+let cardPopup = null;
+function showStation(s, zoom = Math.max(map.getZoom(), SELECT_ZOOM)) {
   enrich(s).then(changed => { if (changed && current === s) { render(); showStation(s); } });
   current = s;
+  render();
   if (desktop.matches) {
     map.setView(s.pos, zoom, { animate: false });
-    const popup = L.popup({ className: 'st-pop', closeButton: false, maxWidth: 360, minWidth: 360, offset: [0, -18],
+    cardPopup = null;   // opening closes the previous popup, which must not clear the new selection
+    const popup = cardPopup = L.popup({ className: 'st-pop', closeButton: false, maxWidth: 360, minWidth: 360, offset: [0, -18],
                             autoPanPaddingTopLeft: [20, 150], autoPanPaddingBottomRight: [20, 70] })
       .setLatLng(s.pos).setContent(cardHtml(s)).openOn(map);
     // Not document.querySelector: the previous popup is still in the DOM while it fades out.
@@ -512,6 +525,7 @@ function showStation(s, zoom = map.getZoom()) {
   map.panBy([0, sheet.offsetHeight / 2], { animate: false });
 }
 map.on('click', () => { if (!desktop.matches && current) closeCard(); });
+map.on('popupclose', e => { if (e.popup === cardPopup) { cardPopup = null; current = null; render(); } });
 
 function wireCard(root, s) {
   root.querySelector('.sh-close').onclick = closeCard;
@@ -532,7 +546,7 @@ function favCard(s) {
   const b = document.createElement('button');
   b.className = 'fav-card';
   b.innerHTML = `<b>⭐ ${title(s.ville)}</b><div class="fuels">${wanted.slice(0, 3).map(cell).join('')}${openState(s).open === false ? '<span class="ko">fermé</span>' : ''}</div>`;
-  b.onclick = () => showStation(s, 16);
+  b.onclick = () => showStation(s);
   return b;
 }
 
@@ -693,7 +707,7 @@ document.getElementById('list-btn').onclick = () => {
 };
 document.getElementById('list-rows').onclick = e => {
   const s = stations.find(x => x.id === +e.target.closest('.row')?.dataset.id);
-  if (s) showStation(s, Math.max(map.getZoom(), 15));
+  if (s) showStation(s);
 };
 document.getElementById('list-close').onclick = () => { listBox.hidden = true; };
 document.getElementById('fuel-chip').onclick = () => { prefs.hidden = !prefs.hidden; renderPrefs(); };
