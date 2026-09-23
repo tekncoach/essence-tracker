@@ -862,13 +862,15 @@ async function loadStations(center = map.getCenter()) {
     // The 100 stations nearest the view centre, plus favourites by id wherever they are.
     const point = `geom'POINT(${c[1]} ${c[0]})'`;
     const near = `within_distance(geom, ${point}, ${radius.toFixed(1)}km)`;
+    // Favourites and a linked station come from their own query: in a dense area the 100 nearest would crowd them out.
     const ids = [...favorites, pendingStation].filter(Boolean);
-    const where = encodeURIComponent(ids.length ? `${near} OR id IN (${ids.join(',')})` : near);
-    const [data, meta] = await Promise.all([
-      fetch(`${OFFICIAL}/records?where=${where}&order_by=${encodeURIComponent(`distance(geom, ${point})`)}&limit=100`).then(r => r.json()),
+    const [data, meta, byId] = await Promise.all([
+      fetch(`${OFFICIAL}/records?where=${encodeURIComponent(near)}&order_by=${encodeURIComponent(`distance(geom, ${point})`)}&limit=100`).then(r => r.json()),
       fetch(OFFICIAL).then(r => r.json()),
+      ids.length ? fetch(`${OFFICIAL}/records?where=${encodeURIComponent(`id IN (${ids.join(',')})`)}&limit=100`).then(r => r.json()) : { results: [] },
     ]);
-    const next = data.results.map(parseStation);
+    const seen = new Set(data.results.map(r => r.id));
+    const next = [...data.results, ...byId.results.filter(r => !seen.has(r.id))].map(parseStation);
     await applyBrands(next);
     await Promise.all(next.filter(s => isFav(s.id)).map(enrich));
     if (seq !== loadSeq) return;
