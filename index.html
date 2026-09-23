@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Essence</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f2230">
+<link rel="icon" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Essence">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
@@ -49,6 +56,8 @@
   .fuel-opt img { width: 28px; height: 28px; }
   .fuel-opt input { width: 18px; height: 18px; }
   .fuel-opt .up { border: 0; background: var(--line); color: var(--fg); border-radius: 6px; cursor: pointer; height: 24px; }
+  #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
+  #install button { float: right; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
   .fuel-opt .rank { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
   #status, .btn { background: var(--card); color: var(--muted); font: inherit; font-size: 12px; padding: 4px 8px;
     border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.15); border: 0; }
@@ -130,6 +139,10 @@
     <h3>Mes carburants</h3>
     <p>Cochez ceux qui vous intéressent. Le premier disponible fixe la taille du pin et s’affiche en premier.</p>
     <div id="fuel-list"></div>
+  </div>
+  <div id="install" class="panel" hidden>
+    <button aria-label="Fermer">✕</button>
+    Pour l’installer comme une app : touchez <b>Partager</b> <span aria-hidden="true">⎋</span> puis <b>Sur l’écran d’accueil</b>.
   </div>
   <div id="favs"></div>
   <div id="bar"><div id="status">Chargement…</div></div>
@@ -592,7 +605,15 @@ q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key 
 
 (async () => {
   if (!store.get('fuels')) { prefs.hidden = false; renderPrefs(); }
+  // iOS never offers installation by itself: explain it once, in Safari, when not already installed.
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent), standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (ios && !standalone && !store.get('installHintSeen')) {
+    const hint = document.getElementById('install');
+    hint.hidden = false;
+    hint.querySelector('button').onclick = () => { hint.hidden = true; store.set('installHintSeen', true); };
+  }
   totalCodes = await fetch('total-codes.json').then(r => r.json()).catch(() => ({}));
+  if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (origin) return loadStations(origin);
   document.getElementById('status').textContent = 'Zoomez sur une zone ou touchez « Autour de moi »';
   // Locate straight away only if the browser already allowed it; otherwise wait for the button.
