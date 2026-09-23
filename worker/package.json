@@ -1,0 +1,14 @@
+{
+  "name": "essence-alerts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/"
+  },
+  "devDependencies": {
+    "http_ece": "^1.2.1",
+    "wrangler": "4.137.0"
+  }
+}

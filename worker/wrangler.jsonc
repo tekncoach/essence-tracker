@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "essence-alerts",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-23",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  // Hourly check of the fuels users asked to be told about.
+  "triggers": { "crons": ["0 * * * *"] },
+  "kv_namespaces": [{ "binding": "ALERTS", "id": "a477a63673b444dea5364faca36920dd" }],
+  "vars": {
+    "VAPID_PUBLIC": "BPn304swT_99wGhstgqz8Sjp05z_E62JKJuyJVcveVpT4WJXR90eK2KisFgQOsnxmqoNXkbYhMgB0-fMuevFAG8",
+    "VAPID_SUBJECT": "https://tekncoach.github.io/essence-tracker/",
+    "ALLOWED_ORIGINS": "https://tekncoach.github.io,http://localhost:8765,http://192.168.1.33:8765"
+  }
+  // VAPID_PRIVATE_JWK is a secret: .dev.vars locally, "wrangler secret put" when deployed.
+}
