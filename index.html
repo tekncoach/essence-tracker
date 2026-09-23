@@ -93,13 +93,18 @@
   .row .p .stale { color: var(--stale); }
   .row .p .na { font-size: 16px; color: var(--muted); }
   .row.off { opacity: .75; }
+  .grab-wrap { display: none; background: var(--head); padding: 8px 0 2px; touch-action: none; cursor: grab; }
+  .grab { width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.35); margin: 0 auto; }
   .list-foot { padding: 8px 14px 12px; font-size: 11px; color: var(--muted); }
   .note { margin: 8px 0 0 !important; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px !important; }
   @media (max-width: 699px) {
     #prefs-btn, #list-btn, #favs, #bar { display: none !important; }
     #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh; max-height: none;
       border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3); padding-bottom: env(safe-area-inset-bottom, 0); }
-    .list-head { grid-template-columns: auto 1fr; }
+    .list-head { grid-template-columns: auto 1fr; touch-action: none; }
+    .grab-wrap { display: block; }
+    #list.snapping { transition: height .25s ease; }
+    #sheet .sh-head { touch-action: none; }
   }
   #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
   #install button { float: right; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
@@ -191,6 +196,7 @@
     <p class="note">Sur la carte, plus le pin est gros, moins la station est chère. En gris : rupture ou fermée.</p>
   </div>
   <div id="list" hidden>
+    <div class="grab-wrap"><div class="grab"></div></div>
     <div class="list-head">
       <span class="lh-title">Carburant</span><span class="lh-title">Tri stations</span>
       <button id="fuel-chip"></button>
@@ -459,7 +465,7 @@ function showStation(s, zoom = map.getZoom()) {
     wireCard(popup.getElement(), s);
     return;
   }
-  sheet.innerHTML = cardHtml(s);
+  sheet.innerHTML = '<div class="grab-wrap"><div class="grab"></div></div>' + cardHtml(s);
   wireCard(sheet, s);
   sheet.scrollTop = 0;
   sheet.classList.add('open');
@@ -755,6 +761,66 @@ q.oninput = () => {
 };
 map.on('click', () => { results.replaceChildren(); prefs.hidden = true; });
 q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key === 'Escape') results.replaceChildren(); };
+
+// Mobile gestures. drag() reports the vertical move of a finger that started on one of the handles; a move of
+// less than 8 px stays a tap, so the buttons inside the handles keep working.
+function drag(handles, { start, move, end }) {
+  for (const h of handles) h.addEventListener('pointerdown', e => {
+    if (desktop.matches || e.button > 0) return;
+    const y0 = e.clientY, t0 = Date.now();
+    let moved = false;
+    const onMove = ev => {
+      const dy = ev.clientY - y0;
+      if (!moved && Math.abs(dy) < 8) return;
+      if (!moved) { moved = true; h.setPointerCapture(e.pointerId); start(); }
+      move(dy);
+    };
+    const onUp = ev => {
+      removeEventListener('pointermove', onMove);
+      removeEventListener('pointerup', onUp);
+      removeEventListener('pointercancel', onUp);
+      if (!moved) return;
+      // Swallow the click that follows a drag started on a button.
+      addEventListener('click', c => c.stopPropagation(), { capture: true, once: true });
+      const dy = ev.clientY - y0;
+      end(dy, dy / Math.max(1, Date.now() - t0));   // velocity in px/ms, positive downwards
+    };
+    addEventListener('pointermove', onMove);
+    addEventListener('pointerup', onUp);
+    addEventListener('pointercancel', onUp);
+  });
+}
+
+// List sheet: three heights (header only, half screen, almost full), picked by where the finger lets go,
+// pushed further by a flick.
+const listSnaps = () => [listBox.querySelector('.list-head').offsetHeight + 24, innerHeight * .45, innerHeight - 70];
+let listStartH;
+function snapList(h) {
+  listBox.classList.add('snapping');
+  listBox.style.height = `${h}px`;
+  setTimeout(() => listBox.classList.remove('snapping'), 260);
+}
+drag([listBox.querySelector('.grab-wrap'), listBox.querySelector('.list-head')], {
+  start() { listStartH = listBox.offsetHeight; },
+  move(dy) { const [lo, , hi] = listSnaps(); listBox.style.height = `${Math.min(hi, Math.max(lo, listStartH - dy))}px`; },
+  end(dy, v) {
+    const aim = listBox.offsetHeight - v * 250;
+    snapList(listSnaps().reduce((a, b) => Math.abs(b - aim) < Math.abs(a - aim) ? b : a));
+  },
+});
+
+// Station card: follows the finger downwards, closes past 90 px or on a downward flick.
+new MutationObserver(() => {
+  const handles = [...sheet.querySelectorAll('.grab-wrap, .sh-head')];
+  handles.forEach(h => h.dataset.drag || (h.dataset.drag = 1, drag([h], {
+    start() { sheet.style.transition = 'none'; },
+    move(dy) { sheet.style.transform = `translateY(${Math.max(0, dy)}px)`; },
+    end(dy, v) {
+      sheet.style.transition = sheet.style.transform = '';   // back to the CSS slide, from where the finger left it
+      if (dy > 90 || v > .5) closeCard();
+    },
+  })));
+}).observe(sheet, { childList: true });
 
 (async () => {
   if (!desktop.matches) listBox.hidden = false;
