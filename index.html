@@ -139,6 +139,8 @@
   .fuel .na { color: var(--muted); font-size: 16px; }
   .fuel .when { display: block; font-size: 11px; color: var(--muted); }
   .fuel .when.stale { color: var(--stale); }
+  .gone summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 10px 0 4px; }
+  .gone .fuel { opacity: .6; }
   .info { font-size: 13px; color: var(--muted); margin: 4px 0; }
   .info.ok { color: var(--ok); } .info.ko { color: var(--ko); }
   .links { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin-top: 10px; }
@@ -354,6 +356,11 @@ function pinHtml(s, rank, st) {
     style="--s:${st.size};width:${st.size}px;height:${st.size}px">${logoHtml(s)}</div>${isFav(s.id) ? '<span class="star">⭐</span>' : ''}${tag}</div>`;
 }
 
+// Not sold any more: declared as a definitive rupture, or a "temporary" one older than GONE_DAYS (stations
+// often leave a dropped fuel as temporary for years). Shown folded at the bottom of the card.
+const GONE_DAYS = 30;
+const gone = f => f.rupture && (f.definitive || Date.now() - f.since > GONE_DAYS * 864e5);
+
 function fuelRow(n, f) {
   const meta = FUELS[n] || { color: '#999', sub: '', label: n };
   const picto = PICTOS.includes(n) ? `<img src="fuels/${n}.png" alt="">` : '<span></span>';
@@ -373,8 +380,10 @@ function fuelRow(n, f) {
 
 function cardHtml(s) {
   const o = openState(s);
-  const rows = FUEL_ORDER.filter(n => s.fuels[n] && (wanted.includes(n) || !s.fuels[n].rupture))
+  const listed = FUEL_ORDER.filter(n => s.fuels[n]);
+  const rows = listed.filter(n => !gone(s.fuels[n]) && (wanted.includes(n) || !s.fuels[n].rupture))
     .map(n => fuelRow(n, s.fuels[n])).join('');
+  const goneRows = listed.filter(n => gone(s.fuels[n])).map(n => fuelRow(n, s.fuels[n]));
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   // total-codes.json is matched by distance, so only trust it for stations 2aaz also labels TotalEnergies.
   const te = s.short?.startsWith('total') && totalCodes[s.id];
@@ -395,7 +404,8 @@ function cardHtml(s) {
     </div>
     <div class="sh-body">
       <div class="sec">Carburants au ${today}</div>
-      ${rows || '<div class="info">Aucun carburant déclaré.</div>'}
+      ${rows || '<div class="info">Aucun carburant disponible.</div>'}
+      ${goneRows.length ? `<details class="gone"><summary>Plus vendus (${goneRows.length})</summary>${goneRows.join('')}</details>` : ''}
       <div class="sec">Accès</div>
       <div class="info ${{ true: 'ok', false: 'ko' }[o.open] || ''}">${o.text}</div>
       <div class="info">${s.brand || ''} · id ${s.id} · position ${s.posOsm ? 'OpenStreetMap' : 'officielle (±100 m)'}</div>
