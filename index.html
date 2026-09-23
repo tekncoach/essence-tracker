@@ -211,6 +211,8 @@
   .go { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: #fff !important; text-decoration: none;
     font-weight: 600; padding: 5px 12px 5px 5px; border-radius: 18px; white-space: nowrap; }
   .go img { width: 24px; height: 24px; border-radius: 6px; }
+  .go .ico { width: 20px; height: 20px; margin-left: 4px; }
+  button.go { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
   .go.alt { background: rgba(255,255,255,.14); }
   /* Address and pin: long press (right click on desktop) opens the copy menu instead of the system callout */
   .sh-head .addr { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: context-menu; }
@@ -519,10 +521,15 @@ function fuelRow(n, f, s) {
 
 // Navigation apps (icons: the apps' App Store artwork, icons/nav/). Apple Plans and Waze take the station as destination; Google Maps too, and becomes a stop on the
 // planned trip when one is set.
+const android = /Android/i.test(navigator.userAgent);
+const PIN_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
+const SHARE_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
 function navLinks(s) {
   const [lat, lon] = s.pos;
+  const name = encodeURIComponent(title(s.name) || s.brand || 'Station');
   return [
-    ['Plans', `https://maps.apple.com/?daddr=${lat},${lon}`, 'apple'],
+    // Android has no Apple Plans, but a geo: link brings up its own "open with" menu of navigation apps.
+    android ? ['Ouvrir avec…', `geo:${lat},${lon}?q=${lat},${lon}(${name})`, 'geo'] : ['Plans', `https://maps.apple.com/?daddr=${lat},${lon}`, 'apple'],
     ['Google Maps', route ? `https://www.google.com/maps/dir/?api=1&origin=${route.start}&destination=${route.dest}&waypoints=${lat},${lon}&travelmode=driving`
                           : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`, 'gmaps'],
     ['Waze', `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`, 'waze'],
@@ -553,7 +560,8 @@ function cardHtml(s) {
         <button class="sh-fav ${isFav(s.id) ? 'on' : ''}" aria-label="Favori">${isFav(s.id) ? '★' : '☆'}</button>
       </div>
       <div class="nav">${navLinks(s).map(([label, url, icon], i) =>
-        `<a class="go${i ? ' alt' : ''}" href="${url}" target="_blank"><img src="icons/nav/${icon}.png" alt="">${label}</a>`).join('')}</div>
+        `<a class="go${i ? ' alt' : ''}" href="${url}" target="_blank">${icon === 'geo' ? PIN_ICON : `<img src="icons/nav/${icon}.png" alt="">`}${label}</a>`).join('')}
+        ${navigator.share ? `<button class="go alt share">${SHARE_ICON}Partager</button>` : ''}</div>
     </div>
     <div class="sh-body">
       <div class="sec">Carburants au ${today}</div>
@@ -653,6 +661,13 @@ map.on('popupclose', e => { if (e.popup === cardPopup) { cardPopup = null; curre
 function wireCard(root, s) {
   root.querySelector('.sh-close').onclick = closeCard;
   longPress(root.querySelector('.addr'), (x, y) => openCopyMenu(s, x, y));
+  // Native share sheet (iPhone included): name, address, coordinates and a map link, to send to any app.
+  const share = root.querySelector('.share');
+  if (share) share.onclick = () => navigator.share({
+    title: title(s.name) || s.brand || 'Station',
+    text: `${title(s.name) || s.brand || 'Station'}\n${title(s.adresse)}, ${s.cp} ${title(s.ville)}\n${s.pos[0].toFixed(6)}, ${s.pos[1].toFixed(6)}`,
+    url: `https://maps.apple.com/?daddr=${s.pos[0]},${s.pos[1]}`,
+  }).catch(() => {});
   root.querySelectorAll('.alert-btn').forEach(b => b.onclick = () => toggleAlert(s, b.dataset.fuel, b));
   const btn = root.querySelector('.sh-fav');
   btn.onclick = () => {
