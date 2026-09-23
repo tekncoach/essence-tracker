@@ -640,17 +640,18 @@ function renderList() {
     const [fa, fb] = [available(a)[0], available(b)[0]];
     return wanted.indexOf(fa) - wanted.indexOf(fb) || a.fuels[fa].price - b.fuels[fb].price;
   }), ...off.sort(byKm)];
-  document.getElementById('list-rows').replaceChildren(...rows.map(s => {
-    const b = document.createElement('button');
+  // Rewritten only when something changed: the list re-renders on every map move and position update,
+  // and replacing a row under a finger loses the tap.
+  const html = rows.map(s => {
     const n = available(s)[0], closed = openState(s).open === false;
-    b.className = 'row' + (buyable(s) ? '' : ' off');
-    b.innerHTML = `${logoHtml(s)}<span class="who"><b>${isFav(s.id) ? '⭐ ' : ''}${title(s.name) || s.brand || 'Station'}</b>
+    return `<button class="row${buyable(s) ? '' : ' off'}" data-id="${s.id}">${logoHtml(s)}
+      <span class="who"><b>${isFav(s.id) ? '⭐ ' : ''}${title(s.name) || s.brand || 'Station'}</b>
       <small>${title(s.ville)}</small><small>${km(s).toFixed(1).replace('.', ',')} km</small></span>
       <span class="p">${!n ? '<span class="na">Indisponible</span>' : closed ? '<span class="na">Fermée</span>'
-        : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}</span>`;
-    b.onclick = () => { showStation(s, Math.max(map.getZoom(), 15)); };
-    return b;
-  }));
+        : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}</span></button>`;
+  }).join('');
+  const rowsBox = document.getElementById('list-rows');
+  if (rowsBox.dataset.html !== html) { rowsBox.innerHTML = html; rowsBox.dataset.html = html; }
   document.getElementById('list-foot').textContent =
     `${statusText} · distance depuis ${origin ? 'votre départ' : 'le centre de la carte'}`;
 }
@@ -658,6 +659,10 @@ document.getElementById('list-btn').onclick = () => {
   listBox.hidden = !listBox.hidden;
   prefs.hidden = true;
   renderList();
+};
+document.getElementById('list-rows').onclick = e => {
+  const s = stations.find(x => x.id === +e.target.closest('.row')?.dataset.id);
+  if (s) showStation(s, Math.max(map.getZoom(), 15));
 };
 document.getElementById('list-close').onclick = () => { listBox.hidden = true; };
 document.getElementById('fuel-chip').onclick = () => { prefs.hidden = !prefs.hidden; renderPrefs(); };
@@ -790,7 +795,10 @@ function drag(handles, { start, move, end }) {
       removeEventListener('pointercancel', onUp);
       if (!moved) return;
       // Swallow the click that follows a drag started on a button.
-      addEventListener('click', c => c.stopPropagation(), { capture: true, once: true });
+      // Only the click fired right away: a leftover listener would eat the next real tap.
+      const swallow = c => c.stopPropagation();
+      addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => removeEventListener('click', swallow, { capture: true }), 50);
       const dy = ev.clientY - y0;
       end(dy, dy / Math.max(1, Date.now() - t0));   // velocity in px/ms, positive downwards
     };
