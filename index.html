@@ -207,8 +207,9 @@
   .sh-fav.on { color: #f5b301; }
   .sh-close { width: 32px; height: 32px; border-radius: 50%; border: 0; background: #fff; color: #000; font-size: 18px; cursor: pointer; }
   .nav { grid-column: 1 / 4; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-  .go { background: var(--accent); color: #fff !important; text-decoration: none; font-weight: 600; padding: 7px 16px;
-    border-radius: 18px; white-space: nowrap; }
+  .go { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: #fff !important; text-decoration: none;
+    font-weight: 600; padding: 5px 12px 5px 5px; border-radius: 18px; white-space: nowrap; }
+  .go img { width: 24px; height: 24px; border-radius: 6px; }
   .go.alt { background: rgba(255,255,255,.14); }
   /* Address and pin: long press (right click on desktop) opens the copy menu instead of the system callout */
   .sh-head .addr { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: context-menu; }
@@ -515,15 +516,15 @@ function fuelRow(n, f, s) {
     <span class="name">${meta.label}<small>${meta.sub}</small></span><span class="val">${val}</span></div>`;
 }
 
-// Navigation apps. Apple Plans and Waze take the station as destination; Google Maps too, and becomes a stop on the
+// Navigation apps (icons: the apps' App Store artwork, icons/nav/). Apple Plans and Waze take the station as destination; Google Maps too, and becomes a stop on the
 // planned trip when one is set.
 function navLinks(s) {
   const [lat, lon] = s.pos;
   return [
-    ['Y aller ›', `https://maps.apple.com/?daddr=${lat},${lon}`],
+    ['Plans', `https://maps.apple.com/?daddr=${lat},${lon}`, 'apple'],
     ['Google Maps', route ? `https://www.google.com/maps/dir/?api=1&origin=${route.start}&destination=${route.dest}&waypoints=${lat},${lon}&travelmode=driving`
-                          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`],
-    ['Waze', `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`],
+                          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`, 'gmaps'],
+    ['Waze', `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`, 'waze'],
   ];
 }
 
@@ -550,7 +551,8 @@ function cardHtml(s) {
         <button class="sh-close" aria-label="Fermer">✕</button>
         <button class="sh-fav ${isFav(s.id) ? 'on' : ''}" aria-label="Favori">${isFav(s.id) ? '★' : '☆'}</button>
       </div>
-      <div class="nav">${navLinks(s).map(([label, url], i) => `<a class="go${i ? ' alt' : ''}" href="${url}" target="_blank">${label}</a>`).join('')}</div>
+      <div class="nav">${navLinks(s).map(([label, url, icon], i) =>
+        `<a class="go${i ? ' alt' : ''}" href="${url}" target="_blank"><img src="icons/nav/${icon}.png" alt="">${label}</a>`).join('')}</div>
     </div>
     <div class="sh-body">
       <div class="sec">Carburants au ${today}</div>
