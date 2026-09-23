@@ -122,11 +122,12 @@ async function checkAlerts(env) {
     if (price === undefined) continue;
     const alert = await env.ALERTS.get(key, 'json');
     if (!alert) continue;
+    // One unreachable push service must not stop the round: that alert stays and is retried next hour.
     const status = await sendPush(alert.subscription, {
       title: `${LABELS[m.fuel]} de retour`,
       body: `${m.name || 'Station ' + m.stationId}${price ? ` : ${price.toFixed(3).replace('.', ',')} €` : ''}`,
       url: `./?station=${m.stationId}`,
-    }, vapid(env));
+    }, vapid(env)).catch(e => { console.log('push failed', m.stationId, m.fuel, e.message); return 0; });
     // One-shot: delete once delivered, and also when the push service says the subscription is gone.
     if (status < 300 || status === 404 || status === 410) await env.ALERTS.delete(key);
     if (status < 300) sent++;
