@@ -25,7 +25,8 @@
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }   /* panels set their own display, which would override the attribute */
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
-    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden; overscroll-behavior: none; }   /* an app screen: the page itself never scrolls or bounces */
   #map { position: fixed; inset: 0; }   /* fixed: covers the whole screen, home-indicator area included */
 
   #top { position: absolute; z-index: 1000; top: env(safe-area-inset-top, 0); left: 0; right: 0;
@@ -156,10 +157,13 @@
     box-shadow: 0 0 0 6px rgba(45,124,246,.25), 0 1px 4px rgba(0,0,0,.4); }
 
   /* Station card: bottom sheet on mobile, map popup on desktop */
-  #sheet { position: absolute; z-index: 1100; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto;
+  /* Fixed to the screen, not the page: on iOS the page stops short of the screen bottom, and a closed card pushed
+     just below the page stayed visible in that gap. Hidden once slid out. */
+  #sheet { position: fixed; z-index: 1100; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto;
     background: var(--sheet); border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3);
-    transform: translateY(105%); transition: transform .25s ease; padding-bottom: env(safe-area-inset-bottom, 0); }
-  #sheet.open { transform: none; }
+    transform: translateY(calc(100% + 40px)); visibility: hidden; transition: transform .25s ease, visibility 0s .25s;
+    padding-bottom: env(safe-area-inset-bottom, 0); }
+  #sheet.open { transform: none; visibility: visible; transition: transform .25s ease; }
   .st-pop .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-radius: 16px; background: var(--sheet); color: var(--fg); }
   .st-pop .leaflet-popup-content { margin: 0; width: 360px !important; max-height: calc(100vh - 200px); overflow-y: auto; font: inherit; }
   .st-pop .leaflet-popup-tip { background: var(--sheet); }
