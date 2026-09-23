@@ -1,5 +1,11 @@
 # essence-tracker
 
+[![Site](https://img.shields.io/badge/site-tekncoach.github.io%2Fessence--tracker-f08a3c)](https://tekncoach.github.io/essence-tracker/)
+[![Déploiement](https://github.com/tekncoach/essence-tracker/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/tekncoach/essence-tracker/actions/workflows/pages/pages-build-deployment)
+[![Dernier commit](https://img.shields.io/github/last-commit/tekncoach/essence-tracker)](https://github.com/tekncoach/essence-tracker/commits/main)
+[![Données](https://img.shields.io/badge/données-prix--carburants.gouv.fr-000091)](https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/)
+![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)
+
 Carte des stations-service françaises avec le prix, la fraîcheur et la disponibilité de chaque carburant. Page statique, sans serveur ni compte : tout tourne dans le navigateur, et les réglages de chaque utilisateur (carburants préférés, favoris, point de départ) restent dans son `localStorage`.
 
 ## Fonctionnalités
