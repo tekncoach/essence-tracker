@@ -52,7 +52,8 @@
     background: var(--head); color: #fff; border-radius: 18px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600;
     box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; }
   #route-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #route-chip .x { width: 24px; height: 24px; font-size: 12px; background: rgba(255,255,255,.18); color: #fff; }
+  #route-chip .x { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; padding: 0; line-height: 1;
+    font-size: 12px; background: rgba(255,255,255,.18); color: #fff; }
   #route .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 0; font-size: 14px; }
   #route .field small { color: var(--muted); }
   #route input, #route select { font: inherit; font-size: 16px; padding: 7px 9px; border-radius: 9px; border: 1px solid var(--line);
