@@ -58,26 +58,49 @@
   .fuel-opt img { width: 28px; height: 28px; }
   .fuel-opt input { width: 18px; height: 18px; }
   .fuel-opt .up { border: 0; background: var(--line); color: var(--fg); border-radius: 6px; cursor: pointer; height: 24px; }
-  #list { pointer-events: auto; background: var(--sheet); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.25);
-    max-width: 380px; max-height: calc(100vh - 190px); display: flex; flex-direction: column; overflow: hidden; }
-  @media (max-width: 699px) { #list { max-width: none; max-height: 55vh; } }
-  .list-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
-  .list-head b { flex: 1; }
-  .seg { display: flex; background: var(--line); border-radius: 8px; padding: 2px; }
-  .seg button { border: 0; background: none; color: var(--fg); font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px; cursor: pointer; }
-  .seg button.on { background: var(--sheet); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-  #list-rows { overflow-y: auto; }
-  .row { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 8px 12px;
+  /* Station list: floating panel on desktop, bottom sheet on mobile */
+  #list { pointer-events: auto; background: var(--sheet); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.25);
+    width: 380px; max-height: calc(100vh - 150px); display: flex; flex-direction: column; overflow: hidden; }
+  .list-head { background: var(--head); color: #fff; padding: 10px 14px 12px; display: grid;
+    grid-template-columns: auto 1fr; gap: 4px 12px; align-items: end; }
+  .list-head .lh-title { font-size: 15px; font-weight: 700; }
+  #fuel-chip { display: flex; align-items: center; gap: 6px; border: 0; border-radius: 10px; padding: 7px 10px;
+    background: rgba(255,255,255,.14); color: #fff; font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  #fuel-chip .bar { width: 5px; height: 18px; border-radius: 3px; }
+  #fuel-chip small { font-weight: 400; opacity: .7; }
+  .seg { display: flex; background: rgba(255,255,255,.14); border-radius: 10px; padding: 3px; }
+  .seg button { flex: 1; border: 0; background: none; color: #fff; font: inherit; font-size: 13px; padding: 5px 8px;
+    border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .seg button.on { background: rgba(255,255,255,.22); font-weight: 600; }
+  #list-favs { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; }
+  #list-favs:empty { display: none; }
+  @media (min-width: 700px) { #list-favs { display: none; } }   /* the favourites strip is already on screen */
+  #list-favs .fav-card { flex: 0 0 120px; box-shadow: none; background: var(--line); }
+  #list-rows { overflow-y: auto; flex: 1; min-height: 0; }
+  .list-head, #list-favs, .list-foot { flex-shrink: 0; }
+  .row { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; width: 100%; padding: 12px 14px;
     border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
   .row:hover { background: var(--line); }
-  .row img { width: 32px; height: 32px; object-fit: contain; }
+  .row img { width: 40px; height: 40px; object-fit: contain; }
   .row .initials { font-size: 11px; font-weight: 700; }
   .row .who { min-width: 0; }
-  .row .who b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row .who small { color: var(--muted); font-size: 12px; }
-  .row .p { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .row .p b { display: block; font-size: 15px; color: var(--fg); }
-  .list-foot { padding: 6px 12px; font-size: 11px; color: var(--muted); }
+  .row .who b { display: block; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .who small { display: block; color: var(--muted); font-size: 13px; }
+  .row .p { text-align: right; white-space: nowrap; }
+  .row .p b { display: block; font-size: 21px; }
+  .row .p small { font-size: 12px; color: var(--muted); }
+  .row .p .today { color: var(--ok); }
+  .row .p .stale { color: var(--stale); }
+  .row .p .na { font-size: 16px; color: var(--muted); }
+  .row.off { opacity: .75; }
+  .list-foot { padding: 8px 14px 12px; font-size: 11px; color: var(--muted); }
+  .note { margin: 8px 0 0 !important; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px !important; }
+  @media (max-width: 699px) {
+    #prefs-btn, #list-btn, #favs, #bar { display: none !important; }
+    #list { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 45vh; max-height: none;
+      border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.3); padding-bottom: env(safe-area-inset-bottom, 0); }
+    .list-head { grid-template-columns: auto 1fr; }
+  }
   #install { pointer-events: auto; max-width: 380px; font-size: 13px; }
   #install button { float: right; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
   .fuel-opt .sub { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 5px; }
@@ -165,11 +188,15 @@
     <h3>Mes carburants</h3>
     <p>Cochez ceux qui vous intéressent. Le premier disponible fixe la taille du pin et s’affiche en premier.</p>
     <div id="fuel-list"></div>
+    <p class="note">Sur la carte, plus le pin est gros, moins la station est chère. En gris : rupture ou fermée.</p>
   </div>
   <div id="list" hidden>
-    <div class="list-head"><b id="list-title">Stations</b>
-      <div class="seg"><button data-sort="price" class="on">Prix</button><button data-sort="dist">Distance</button></div>
+    <div class="list-head">
+      <span class="lh-title">Carburant</span><span class="lh-title">Tri stations</span>
+      <button id="fuel-chip"></button>
+      <div class="seg"><button data-sort="price" class="on">La moins chère</button><button data-sort="dist">La plus proche</button></div>
     </div>
+    <div id="list-favs"></div>
     <div id="list-rows"></div>
     <div class="list-foot" id="list-foot"></div>
   </div>
@@ -187,7 +214,7 @@
 // No place is hard-coded: the origin is the device location or a start point saved in this browser
 // (right-click / long-press on the map). Without either, the map opens on France.
 const FRANCE = [46.6, 2.4], MIN_LOAD_ZOOM = 11;
-const MIN_RADIUS_KM = 3, MAX_RADIUS_KM = 10;   // query radius follows the visible area, within these bounds
+const MIN_RADIUS_KM = 5, MAX_RADIUS_KM = 10;   // query radius follows the visible area, within these bounds
 const DEFAULT_FUELS = ['E10', 'Gazole'];   // until the user picks theirs (the panel opens on first visit)
 const STALE_HOURS = 48;
 
@@ -515,15 +542,22 @@ async function refinePositions() {
 }
 try { localStorage.removeItem('brands'); } catch {}   // brand cache format of earlier versions
 
+// Load status: in the top bar on desktop, at the bottom of the list on mobile.
+let statusText = '';
+function setStatus(text) {
+  statusText = text;
+  document.getElementById('status').textContent = text;
+  renderList();
+}
+
 let loaded = null, loadSeq = 0;   // last query centre and radius; sequence number to drop stale responses
 const viewRadiusKm = () => { const b = map.getBounds(); return distKm([b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]) / 2; };
 
 async function loadStations(center = map.getCenter()) {
-  const status = document.getElementById('status');
   const seq = ++loadSeq;
   const c = Array.isArray(center) ? center : [center.lat, center.lng];
   const radius = Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, viewRadiusKm()));
-  status.textContent = 'Chargement…';
+  setStatus('Chargement…');
   try {
     // The 100 stations nearest the view centre, plus favourites by id wherever they are.
     const point = `geom'POINT(${c[1]} ${c[0]})'`;
@@ -543,10 +577,10 @@ async function loadStations(center = map.getCenter()) {
     render();
 
     const processed = new Date(meta.metas.default.data_processed);
-    status.textContent = `${stations.length} stations · flux officiel ${age(processed)} (${fmtDate(processed)}) · plus le pin est gros, moins c’est cher`;
+    setStatus(`${stations.length} stations · flux officiel ${age(processed)} (${fmtDate(processed)})`);
     refinePositions();
   } catch (e) {
-    status.textContent = 'Erreur de chargement : ' + e.message;
+    setStatus('Erreur de chargement : ' + e.message);
   }
 }
 
@@ -565,43 +599,54 @@ function render() {
     cards.push(hint);
   }
   document.getElementById('favs').replaceChildren(...cards);
+  document.getElementById('list-favs').replaceChildren(
+    ...favorites.map(id => stations.find(x => x.id === id)).filter(Boolean).map(favCard));
   renderList();
 }
 
-// List of the stations in view: by price (grouped by the preferred fuel each one is ranked on) or by distance.
+// Station list, as in Mon Essence: cheapest first (grouped by the preferred fuel each station is ranked on),
+// then the unbuyable ones by distance; or everything by distance. Distance from the start point, else the map centre.
 let listSort = 'price';
+const listBox = document.getElementById('list');
+function freshness(d) {
+  const today = d.toDateString() === new Date().toDateString();
+  const stale = (Date.now() - d) / 36e5 > STALE_HOURS;
+  return `<small class="${today ? 'today' : stale ? 'stale' : ''}">${today ? 'Vérifié aujourd’hui' : `Déclaré ${age(d)}`}</small>`;
+}
 function renderList() {
-  const box = document.getElementById('list');
-  if (box.hidden) return;
-  const bounds = map.getBounds(), c = map.getCenter(), from = origin || [c.lat, c.lng];
-  const inView = stations.filter(s => bounds.contains(s.pos));
-  const ok = inView.filter(s => available(s).length && openState(s).open !== false);
+  const main = FUELS[wanted[0]] || {};
+  document.getElementById('fuel-chip').innerHTML =
+    `<span class="bar" style="background:${main.color}"></span>${wanted[0]} <small>${main.sub || ''}</small>${wanted.length > 1 ? ` <small>+${wanted.length - 1}</small>` : ''}`;
+  if (listBox.hidden) return;
+  const c = map.getCenter(), from = origin || [c.lat, c.lng];
   const km = s => distKm(from, s.pos);
-  ok.sort(listSort === 'dist' ? (a, b) => km(a) - km(b) : (a, b) => {
+  const buyable = s => available(s).length && openState(s).open !== false;
+  const ok = stations.filter(buyable), off = stations.filter(s => !buyable(s));
+  const byKm = (a, b) => km(a) - km(b);
+  const rows = listSort === 'dist' ? [...stations].sort(byKm) : [...ok.sort((a, b) => {
     const [fa, fb] = [available(a)[0], available(b)[0]];
     return wanted.indexOf(fa) - wanted.indexOf(fb) || a.fuels[fa].price - b.fuels[fb].price;
-  });
-  document.getElementById('list-title').textContent = `${ok.length} stations dans la vue`;
-  document.getElementById('list-rows').replaceChildren(...ok.map(s => {
+  }), ...off.sort(byKm)];
+  document.getElementById('list-rows').replaceChildren(...rows.map(s => {
     const b = document.createElement('button');
-    b.className = 'row';
-    const [first, second] = available(s);
+    const n = available(s)[0], closed = openState(s).open === false;
+    b.className = 'row' + (buyable(s) ? '' : ' off');
     b.innerHTML = `${logoHtml(s)}<span class="who"><b>${isFav(s.id) ? '⭐ ' : ''}${title(s.name) || s.brand || 'Station'}</b>
-      <small>${title(s.ville)} · ${km(s).toFixed(1).replace('.', ',')} km</small></span>
-      <span class="p"><b>${first} ${euro(s.fuels[first].price)}</b>${second ? `${second} ${euro(s.fuels[second].price)}` : ''}</span>`;
-    b.onclick = () => { if (!desktop.matches) box.hidden = true; showStation(s, Math.max(map.getZoom(), 15)); };
+      <small>${title(s.ville)}</small><small>${km(s).toFixed(1).replace('.', ',')} km</small></span>
+      <span class="p">${!n ? '<span class="na">Indisponible</span>' : closed ? '<span class="na">Fermée</span>'
+        : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}</span>`;
+    b.onclick = () => { showStation(s, Math.max(map.getZoom(), 15)); };
     return b;
   }));
-  const hiddenCount = inView.length - ok.length;
   document.getElementById('list-foot').textContent =
-    `${hiddenCount ? `${hiddenCount} en rupture ou fermées non listées · ` : ''}distance depuis ${origin ? 'votre départ' : 'le centre de la carte'}`;
+    `${statusText} · distance depuis ${origin ? 'votre départ' : 'le centre de la carte'}`;
 }
 document.getElementById('list-btn').onclick = () => {
-  const box = document.getElementById('list');
-  box.hidden = !box.hidden;
+  listBox.hidden = !listBox.hidden;
   prefs.hidden = true;
   renderList();
 };
+document.getElementById('fuel-chip').onclick = () => { prefs.hidden = !prefs.hidden; renderPrefs(); };
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
   listSort = b.dataset.sort;
   document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b));
@@ -623,7 +668,7 @@ map.on('moveend', () => {
   clearTimeout(moveTimer);
   moveTimer = setTimeout(() => {
     if (map.getZoom() < MIN_LOAD_ZOOM) {
-      if (!loaded) document.getElementById('status').textContent = 'Zoomez sur une zone ou touchez « Autour de moi »';
+      if (!loaded) setStatus('Zoomez sur une zone ou touchez « Autour de moi »');
       return;
     }
     const c = map.getCenter();
@@ -634,13 +679,12 @@ map.on('moveend', () => {
 });
 
 document.getElementById('locate').onclick = () => {
-  const status = document.getElementById('status');
-  if (!navigator.geolocation) { status.textContent = 'Géolocalisation non disponible'; return; }
-  status.textContent = 'Localisation…';
+  if (!navigator.geolocation) { setStatus('Géolocalisation non disponible'); return; }
+  setStatus('Localisation…');
   navigator.geolocation.getCurrentPosition(
     p => setOrigin([p.coords.latitude, p.coords.longitude], false),
-    e => { status.textContent = window.isSecureContext ? `Localisation refusée : ${e.message}`
-                                                       : 'Localisation impossible : la page doit être servie en https'; },
+    e => setStatus(window.isSecureContext ? `Localisation refusée : ${e.message}`
+                                          : 'Localisation impossible : la page doit être servie en https'),
     { enableHighAccuracy: true, timeout: 10000 });
 };
 // Right-click (desktop) or long-press (mobile): save a start point in this browser only.
@@ -671,6 +715,7 @@ function setFuels(list) {
   wanted = list;
   store.set('fuels', wanted);
   renderPrefs();
+  renderList();
   if (loaded) loadStations(map.getCenter());   // 2aaz may know statuses of newly wanted fuels
 }
 const prefs = document.getElementById('prefs');
@@ -712,6 +757,7 @@ map.on('click', () => { results.replaceChildren(); prefs.hidden = true; });
 q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key === 'Escape') results.replaceChildren(); };
 
 (async () => {
+  if (!desktop.matches) listBox.hidden = false;
   if (!store.get('fuels')) { prefs.hidden = false; renderPrefs(); }
   // iOS never offers installation by itself: explain it once, in Safari, when not already installed.
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent), standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
@@ -724,7 +770,7 @@ q.onkeydown = e => { if (e.key === 'Enter' && hits[0]) pick(hits[0]); if (e.key 
     .map(f => fetch(f).then(r => r.json()).catch(() => ({}))));
   if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (origin) return loadStations(origin);
-  document.getElementById('status').textContent = 'Zoomez sur une zone ou touchez « Autour de moi »';
+  setStatus('Zoomez sur une zone ou touchez « Autour de moi »');
   // Locate straight away only if the browser already allowed it; otherwise wait for the button.
   const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
   if (perm?.state === 'granted') document.getElementById('locate').click();
