@@ -203,6 +203,15 @@
   .fuel .na { color: var(--muted); font-size: 16px; }
   .fuel .when { display: block; font-size: 11px; color: var(--muted); }
   .fuel .when.stale { color: var(--stale); }
+  .alert-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; border: 1.5px solid var(--accent);
+    background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px;
+    border-radius: 14px; cursor: pointer; }
+  .alert-btn .ico { width: 14px; height: 14px; vertical-align: 0; }
+  .alert-btn.on { background: var(--accent); color: #fff; }
+  #alerts-list:empty { display: none; }
+  .alert-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .alert-row span { flex: 1; min-width: 0; }
+  .alert-row small { display: block; color: var(--muted); font-size: 11px; }
   .gone summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 10px 0 4px; }
   .gone .fuel { opacity: .6; }
   .info { font-size: 13px; color: var(--muted); margin: 4px 0; }
@@ -229,6 +238,7 @@
     <div class="panel-head"><h3>Mes carburants</h3><button class="x" id="prefs-close" aria-label="Fermer">✕</button></div>
     <p>Cochez ceux qui vous intéressent. Le premier disponible fixe la taille du pin et s’affiche en premier.</p>
     <div id="fuel-list"></div>
+    <div id="alerts-list"></div>
     <p class="note">Sur la carte, plus le pin est gros, moins la station est chère. En gris : rupture ou fermée.</p>
   </div>
   <div id="list" hidden>
@@ -263,6 +273,10 @@ const STALE_HOURS = 48;
 
 const OFFICIAL = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2';
 const BRAND_API = 'https://api.prix-carburants.2aaz.fr/station/';
+// Fuel return alerts: Cloudflare Worker (worker/) checking hourly, Web Push signed with this public VAPID key.
+const ALERTS_API = 'https://essence-alerts.tekncoach.workers.dev';
+const VAPID_PUBLIC = 'BPn304swT_99wGhstgqz8Sjp05z_E62JKJuyJVcveVpT4WJXR90eK2KisFgQOsnxmqoNXkbYhMgB0-fMuevFAG8';
+const BELL = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
 // logos/<2aaz brand shortName>.png, 96 px, from mon-essence.fr; 'autre' is the unbranded pump.
 const LOGOS = new Set(['auchan', 'autre', 'avia', 'campus', 'carrefour', 'carrefourcontact', 'carrefourexpress',
   'carrefourmarket', 'dyneff', 'elan', 'eleclerc', 'eni', 'esso', 'essoexpress', 'intercontact', 'intermarche', 'k9',
@@ -436,14 +450,16 @@ function pinHtml(s, rank, st) {
 const GONE_DAYS = 30;
 const gone = f => f.rupture && (f.definitive || Date.now() - f.since > GONE_DAYS * 864e5);
 
-function fuelRow(n, f) {
+function fuelRow(n, f, s) {
   const meta = FUELS[n] || { color: '#999', sub: '', label: n };
   const picto = PICTOS.includes(n) ? `<img src="fuels/${n}.png" alt="">` : '<span></span>';
   const src = f.via2aaz ? ' · via 2aaz' : '';
   let val;
   if (f.rupture) {
+    const on = hasAlert(s.id, n);
     val = `<span class="na">${f.definitive ? 'Plus vendu' : 'Indisponible'}</span>
-      <span class="when">depuis le ${fmtDate(f.since)}${f.last ? ` · dernier prix ${euro(f.last)}` : ''}${src}</span>`;
+      <span class="when">depuis le ${fmtDate(f.since)}${f.last ? ` · dernier prix ${euro(f.last)}` : ''}${src}</span>
+      ${gone(f) ? '' : `<button class="alert-btn${on ? ' on' : ''}" data-fuel="${n}">${BELL} ${on ? 'Alerte active' : 'M’alerter du retour'}</button>`}`;
   } else {
     const stale = (Date.now() - f.maj) / 36e5 > STALE_HOURS;
     val = `<span class="price">${euro(f.price)}</span>
@@ -457,8 +473,8 @@ function cardHtml(s) {
   const o = openState(s);
   const listed = FUEL_ORDER.filter(n => s.fuels[n]);
   const rows = listed.filter(n => !gone(s.fuels[n]) && (wanted.includes(n) || !s.fuels[n].rupture))
-    .map(n => fuelRow(n, s.fuels[n])).join('');
-  const goneRows = listed.filter(n => gone(s.fuels[n])).map(n => fuelRow(n, s.fuels[n]));
+    .map(n => fuelRow(n, s.fuels[n], s)).join('');
+  const goneRows = listed.filter(n => gone(s.fuels[n])).map(n => fuelRow(n, s.fuels[n], s));
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   // total-codes.json is matched by distance, so only trust it for stations 2aaz also labels TotalEnergies.
   const te = s.short?.startsWith('total') && totalCodes[s.id];
@@ -531,6 +547,7 @@ map.on('popupclose', e => { if (e.popup === cardPopup) { cardPopup = null; curre
 
 function wireCard(root, s) {
   root.querySelector('.sh-close').onclick = closeCard;
+  root.querySelectorAll('.alert-btn').forEach(b => b.onclick = () => toggleAlert(s, b.dataset.fuel, b));
   const btn = root.querySelector('.sh-fav');
   btn.onclick = () => {
     favorites = isFav(s.id) ? favorites.filter(id => id !== s.id) : [...favorites, s.id];
@@ -782,6 +799,7 @@ function renderPrefs() {
     if (up) up.onclick = e => { e.preventDefault(); const w = [...wanted]; [w[i - 1], w[i]] = [w[i], w[i - 1]]; setFuels(w); };
     return row;
   }));
+  renderAlerts();
 }
 function setFuels(list) {
   if (!list.length) { renderPrefs(); return; }   // keep at least one fuel
@@ -792,6 +810,80 @@ function setFuels(list) {
   if (loaded) loadStations(map.getCenter());   // 2aaz may know statuses of newly wanted fuels
 }
 const prefs = document.getElementById('prefs');
+
+// Fuel return alerts. The server holds them (one-shot, 7 days); this browser keeps a copy to draw the buttons,
+// refreshed from the server at launch since alerts disappear there once sent or expired.
+let alerts = store.get('alerts') || [];   // [{ stationId, fuel, name, expires }]
+const hasAlert = (id, fuel) => alerts.some(a => +a.stationId === +id && a.fuel === fuel);
+let alertsEdits = 0;   // bumped on every local change, so a slower launch sync cannot overwrite it
+const saveAlerts = list => { alerts = list; alertsEdits++; store.set('alerts', alerts); renderPrefs(); };
+const alertsApi = (path, method, body) => fetch(ALERTS_API + path, {
+  method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+}).then(r => { if (!r.ok) throw new Error(`service d’alertes : ${r.status}`); return r.json(); });
+
+// Push subscription of this device; asks for notification permission (from a tap) when `ask` is set.
+async function pushSubscription(ask) {
+  const reg = 'serviceWorker' in navigator && isSecureContext && await navigator.serviceWorker.ready;
+  if (!reg || !('PushManager' in window)) {
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
+    throw new Error(ios ? 'Pour recevoir des alertes sur iPhone, installez l’app : Partager → Sur l’écran d’accueil, puis ouvrez-la depuis son icône.'
+                        : 'Ce navigateur ne permet pas les notifications.');
+  }
+  const existing = await reg.pushManager.getSubscription();
+  if (existing || !ask) return existing;
+  if (await Notification.requestPermission() !== 'granted') throw new Error('Notifications refusées : autorisez-les dans les réglages du téléphone pour cette app.');
+  const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  alertsApi('/test', 'POST', { subscription: sub.toJSON() }).catch(() => {});   // first alert: confirm delivery at once
+  return sub;
+}
+
+async function toggleAlert(s, fuel, btn) {
+  btn.disabled = true;
+  try {
+    const sub = await pushSubscription(true);
+    const on = hasAlert(s.id, fuel);
+    if (on) {
+      await alertsApi('/alerts', 'DELETE', { endpoint: sub.endpoint, stationId: s.id, fuel });
+      saveAlerts(alerts.filter(a => !(+a.stationId === s.id && a.fuel === fuel)));
+    } else {
+      const name = title(s.name) || s.brand || `Station ${s.id}`;
+      const { expires } = await alertsApi('/alerts', 'POST', { subscription: sub.toJSON(), stationId: s.id, fuel, name });
+      saveAlerts([...alerts, { stationId: String(s.id), fuel, name, expires }]);
+    }
+    btn.classList.toggle('on', !on);
+    btn.innerHTML = `${BELL} ${on ? 'M’alerter du retour' : 'Alerte active'}`;
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function syncAlerts() {
+  if (!alerts.length) return;
+  try {
+    const sub = await pushSubscription(false), edits = alertsEdits;
+    const fresh = sub && (await alertsApi('/alerts/list', 'POST', { endpoint: sub.endpoint })).alerts;
+    if (fresh && edits === alertsEdits) saveAlerts(fresh);
+  } catch {}
+}
+
+function renderAlerts() {
+  const box = document.getElementById('alerts-list');
+  if (!alerts.length) { box.replaceChildren(); return; }
+  box.innerHTML = '<h3 style="margin-top:12px">Mes alertes</h3>' + alerts.map((a, i) =>
+    `<div class="alert-row">${BELL}<span>${a.fuel} · ${a.name}<small>jusqu’au ${new Date(a.expires).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</small></span>
+      <button class="x" data-i="${i}" aria-label="Supprimer l’alerte">✕</button></div>`).join('');
+  box.querySelectorAll('.x').forEach(b => b.onclick = async () => {
+    const a = alerts[+b.dataset.i];
+    try {
+      const sub = await pushSubscription(false);
+      if (sub) await alertsApi('/alerts', 'DELETE', { endpoint: sub.endpoint, stationId: a.stationId, fuel: a.fuel });
+    } catch {}
+    saveAlerts(alerts.filter(x => x !== a));
+  });
+}
 document.getElementById('prefs-btn').onclick = () => { prefs.hidden = !prefs.hidden; renderPrefs(); };
 document.getElementById('prefs-close').onclick = () => { prefs.hidden = true; };
 
@@ -936,7 +1028,7 @@ if (pendingStation) history.replaceState(null, '', location.pathname);
   }
   [totalCodes, brandNames] = await Promise.all(['total-codes.json', 'brands/names.json']
     .map(f => fetch(f).then(r => r.json()).catch(() => ({}))));
-  if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').then(syncAlerts).catch(() => {});
   if (map.getZoom() >= MIN_LOAD_ZOOM) loadStations(map.getCenter());
   else if (origin) loadStations(origin);
   else setStatus('Zoomez sur une zone ou touchez « Autour de moi »');

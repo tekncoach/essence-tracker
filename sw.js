@@ -15,3 +15,20 @@ self.addEventListener('fetch', e => {
     return res;
   }).catch(() => caches.match(e.request)));
 });
+
+// Fuel return alerts (sent by worker/): show the notification; a tap opens the app on the station.
+self.addEventListener('push', e => {
+  const d = e.data ? e.data.json() : {};
+  e.waitUntil(self.registration.showNotification(d.title || 'Essence', {
+    body: d.body || '', icon: 'icons/icon-192.png', data: { url: d.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
+    const win = wins[0];
+    return win ? win.navigate(url).then(w => (w || win).focus()) : self.clients.openWindow(url);
+  }));
+});
