@@ -182,6 +182,11 @@
   .pin.ko { border-color: var(--ko); filter: grayscale(.7); opacity: .75; }
   .pin img { width: calc(var(--s) * .7px); height: calc(var(--s) * .7px); }
   .pin.fav { border-width: 4px; }
+  .pin.check { border-color: #f59f00; }
+  .warn { position: absolute; top: -6px; left: -6px; width: 18px; height: 18px; border-radius: 50%; background: #f59f00; color: #fff;
+    font: 800 12px/18px -apple-system, sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .te-note { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; color: #e67700; }
+  .row .p .check-note { display: block; color: #e67700; font-weight: 600; }
   .pin.sel { border: 4px solid var(--accent); filter: none; animation: selpulse 1.6s ease-out infinite; }
   @keyframes selpulse {
     from { box-shadow: 0 0 0 0 rgba(240,138,60,.7), 0 1px 5px rgba(0,0,0,.35); }
@@ -489,6 +494,29 @@ async function enrich(s) {
   return true;
 }
 
+// Second opinion on Total stations: TotalEnergies' own availability (Worker /total, cached 10 min there). The
+// stations' declarations to the ministry sometimes disagree with it; a disagreement is flagged, not arbitrated.
+const TE_STATUS = { AVAILABLE: 'disponible', UNAVAILABLE: 'rupture' };
+async function applyTotal(list) {
+  const todo = list.filter(s => s.short?.startsWith('total') && totalCodes[s.id] && !s.te);
+  for (let i = 0; i < todo.length; i += 40) {
+    const part = todo.slice(i, i + 40);
+    try {
+      const res = await (await fetch(`${ALERTS_API}/total?codes=${part.map(s => totalCodes[s.id]).join(',')}`)).json();
+      for (const s of part) s.te = res[totalCodes[s.id]] || null;
+    } catch {}
+  }
+  if (todo.length) render();
+}
+// TotalEnergies' status of fuel n when it contradicts the official one, else null.
+function teConflict(s, n) {
+  const te = s.te?.[n];
+  if (te !== 'AVAILABLE' && te !== 'UNAVAILABLE') return null;
+  const official = !!s.fuels[n] && !s.fuels[n].rupture;
+  return official !== (te === 'AVAILABLE') ? te : null;
+}
+const toCheck = s => wanted.some(n => teConflict(s, n));
+
 function logoHtml(s) {
   const file = /costco/i.test(s.name || '') ? 'costco'   // no brand code at 2aaz: recognised by its station name
     : LOGOS.has(s.short) ? s.short : !s.brand || s.short === 'autre' ? 'autre' : null;
@@ -519,8 +547,9 @@ function pinHtml(s, rank, st) {
   const ok = available(s), sel = current?.id === s.id;
   const tag = rank === null ? (isFav(s.id) || sel ? `<span class="tag ko">${ok.length ? 'fermé' : 'rupture'}</span>` : '')
             : `<span class="tag">${ok.slice(0, 2).map(n => `${n} ${short(s.fuels[n].price)}`).join(' · ')}</span>`;
-  return `<div class="marker-wrap" style="opacity:${st.opacity}"><div class="pin ${rank === null ? 'ko' : ''} ${isFav(s.id) ? 'fav' : ''} ${sel ? 'sel' : ''}"
-    style="--s:${st.size};width:${st.size}px;height:${st.size}px">${logoHtml(s)}</div>${isFav(s.id) ? '<span class="star">⭐</span>' : ''}${tag}</div>`;
+  const check = toCheck(s);
+  return `<div class="marker-wrap" style="opacity:${check ? 1 : st.opacity}"><div class="pin ${rank === null ? 'ko' : ''} ${isFav(s.id) ? 'fav' : ''} ${sel ? 'sel' : ''} ${check ? 'check' : ''}"
+    style="--s:${st.size};width:${st.size}px;height:${st.size}px">${logoHtml(s)}</div>${isFav(s.id) ? '<span class="star">⭐</span>' : ''}${check ? '<span class="warn" title="Sources en désaccord">!</span>' : ''}${tag}</div>`;
 }
 
 // Not sold any more: declared as a definitive rupture, or a "temporary" one older than GONE_DAYS (stations
@@ -543,6 +572,8 @@ function fuelRow(n, f, s) {
     val = `<span class="price">${euro(f.price)}</span>
       <span class="when ${stale ? 'stale' : ''}">Déclaré ${age(f.maj)} · ${fmtDate(f.maj)}${src}</span>`;
   }
+  const te = teConflict(s, n);
+  if (te) val += `<span class="te-note">⚠ TotalEnergies indique : ${TE_STATUS[te]}</span>`;
   return `<div class="fuel"><span class="bar" style="background:${meta.color}"></span>${picto}
     <span class="name">${meta.label}<small>${meta.sub}</small></span><span class="val">${val}</span></div>`;
 }
@@ -596,6 +627,7 @@ function cardHtml(s) {
       <div class="sec">Accès</div>
       <div class="info ${{ true: 'ok', false: 'ko' }[o.open] || ''}">${o.text}</div>
       <div class="info">${s.brand || ''} · id ${s.id} · position ${s.posOsm ? 'OpenStreetMap' : 'officielle (±100 m)'}</div>
+      ${s.te ? `<div class="info">Disponibilité comparée avec le site TotalEnergies${toCheck(s) || FUEL_ORDER.some(n => teConflict(s, n)) ? ' : désaccord signalé ⚠, à vérifier sur place' : ' : concordante'}.</div>` : ''}
       <div class="links">
         <a href="https://www.prix-carburants.gouv.fr/station/${s.id}" target="_blank">Fiche prix-carburants.gouv.fr ↗</a>
         ${te ? `<a href="https://locator.totalenergies.com/${te}?type=FUELING&business_type=RETAIL" target="_blank">Fiche TotalEnergies ↗</a>` : ''}
@@ -871,6 +903,7 @@ async function routeStations() {
     for (const r of d.results) out.push(Object.assign(parseStation(r), ids.find(x => x.id === r.id)));
   }
   await applyBrands(out);
+  applyTotal(out);
   return out;
 }
 
@@ -979,6 +1012,7 @@ async function loadStations(center = map.getCenter()) {
     const next = [...data.results, ...byId.results.filter(r => !seen.has(r.id))].map(parseStation);
     await applyBrands(next);
     await Promise.all(next.filter(s => isFav(s.id)).map(enrich));
+    applyTotal(next);   // not awaited: pins show at once, disagreements appear when TotalEnergies answers
     if (seq !== loadSeq) return;
     stations = next;
     loaded = { center: c, radius };
@@ -1056,7 +1090,7 @@ function renderList() {
       <small>${route ? `km ${Math.round(s.along)} · à ${s.off.toFixed(1).replace('.', ',')} km de la route` : `${km(s).toFixed(1).replace('.', ',')} km`}</small>
       ${s === last ? '<span class="badge">Dernière atteignable</span>' : ''}</span>
       <span class="p">${route && !reachable(s) ? '<span class="na">Hors autonomie</span>' : !n ? '<span class="na">Indisponible</span>' : closed ? '<span class="na">Fermée</span>'
-        : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}</span></button>`;
+        : `<b>${euro(s.fuels[n].price)}</b>${n !== wanted[0] ? `<small>${n} · </small>` : ''}${freshness(s.fuels[n].maj)}`}${toCheck(s) ? '<small class="check-note">⚠ à vérifier</small>' : ''}</span></button>`;
   }).join('');
   const rowsBox = document.getElementById('list-rows');
   if (rowsBox.dataset.html !== html) { rowsBox.innerHTML = html; rowsBox.dataset.html = html; }
@@ -1388,6 +1422,7 @@ if (pendingStation) history.replaceState(null, '', location.pathname);
   }
   [totalCodes, brandNames] = await Promise.all(['total-codes.json', 'brands/names.json']
     .map(f => fetch(f).then(r => r.json()).catch(() => ({}))));
+  applyTotal(stations);   // stations restored from the last view may have loaded before the codes
   if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').then(syncAlerts).catch(() => {});
   if (map.getZoom() >= MIN_LOAD_ZOOM) loadStations(map.getCenter());
   else if (origin) loadStations(origin);
