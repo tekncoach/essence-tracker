@@ -141,9 +141,38 @@ async function checkAlerts(env) {
   return { alerts: entries.length, sent };
 }
 
+// Hourly comparison log, to learn which source is right: for the stations in KV key "watch" ([{ id, nf, name }],
+// set with wrangler, not versioned), the official status and TotalEnergies' status of SP98 and E10.
+// One KV write per hour into "log:<day>", kept 30 days.
+async function logSources(env) {
+  const watch = await env.ALERTS.get('watch', 'json');
+  if (!watch?.length) return { logged: 0 };
+  const where = encodeURIComponent(`id IN (${watch.map(w => w.id).join(',')})`);
+  const rows = (await (await fetch(`${OFFICIAL}?where=${where}&select=id,prix,rupture&limit=100`)).json()).results || [];
+  const list = v => { const x = typeof v === 'string' ? JSON.parse(v) : v; return !x ? [] : Array.isArray(x) ? x : [x]; };
+  const official = {};
+  for (const r of rows) {
+    const st = official[r.id] = {};
+    for (const p of list(r.prix)) st[p['@nom']] = ['dispo', p['@maj']];
+    for (const x of list(r.rupture)) st[x['@nom']] = ['rupture', x['@debut']];
+  }
+  const total = await totalStatus(watch.map(w => w.nf), env);
+  const at = new Date().toISOString();
+  const snapshot = watch.map(w => ({
+    id: w.id, name: w.name,
+    ...Object.fromEntries(['SP98', 'E10'].map(f => [f, { gouv: official[w.id]?.[f] || ['absent'], total: total[w.nf]?.[f] || 'absent' }])),
+  }));
+  const key = `log:${at.slice(0, 10)}`;
+  const day = (await env.ALERTS.get(key, 'json')) || [];
+  day.push({ at, stations: snapshot });
+  await env.ALERTS.put(key, JSON.stringify(day), { expirationTtl: 30 * 86400 });
+  return { logged: snapshot.length };
+}
+
 export default {
   fetch: (req, env, ctx) => handle(req, env, ctx),
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(checkAlerts(env).then(r => console.log('alerts checked', r)));
+    ctx.waitUntil(logSources(env).then(r => console.log('sources logged', r)).catch(e => console.log('log failed', e.message)));
   },
 };
