@@ -4,6 +4,7 @@
 // fuel that is buyable again and deletes the alert: alerts are one-shot and expire after TTL_DAYS anyway.
 
 import { sendPush } from './push.js';
+import { totalStatus } from './total.js';
 
 const TTL_DAYS = 7;
 const FUELS = ['SP98', 'E10', 'SP95', 'Gazole', 'E85', 'GPLc'];
@@ -37,7 +38,7 @@ const validAlert = a => /^\d{5,9}$/.test(String(a.stationId)) && FUELS.includes(
 
 const vapid = env => ({ publicKey: env.VAPID_PUBLIC, privateJwk: JSON.parse(env.VAPID_PRIVATE_JWK), subject: env.VAPID_SUBJECT });
 
-async function handle(req, env) {
+async function handle(req, env, ctx) {
   const headers = cors(req, env);
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   const { pathname } = new URL(req.url);
@@ -64,6 +65,11 @@ async function handle(req, env) {
     if (typeof body.endpoint !== 'string') return json({ error: 'bad request' }, 400, headers);
     const { keys } = await env.ALERTS.list({ prefix: await prefixOf(body.endpoint) });
     return json({ alerts: keys.map(k => k.metadata) }, 200, headers);
+  }
+  if (pathname === '/total' && req.method === 'GET') {
+    // ?codes=NF…,NF… — TotalEnergies' availability, shown next to the official one on Total stations
+    const codes = (new URL(req.url).searchParams.get('codes') || '').split(',');
+    return json(await totalStatus(codes, env, ctx), 200, { ...headers, 'Cache-Control': 'max-age=300' });
   }
   if (pathname === '/test' && req.method === 'POST') {
     // { subscription } — confirms that notifications reach the device
@@ -136,7 +142,7 @@ async function checkAlerts(env) {
 }
 
 export default {
-  fetch: (req, env) => handle(req, env),
+  fetch: (req, env, ctx) => handle(req, env, ctx),
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(checkAlerts(env).then(r => console.log('alerts checked', r)));
   },

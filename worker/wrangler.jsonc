@@ -13,5 +13,5 @@
     "VAPID_SUBJECT": "https://tekncoach.github.io/essence-tracker/",
     "ALLOWED_ORIGINS": "https://tekncoach.github.io,http://localhost:8765,http://192.168.1.33:8765"
   }
-  // VAPID_PRIVATE_JWK is a secret: .dev.vars locally, "wrangler secret put" when deployed.
+  // Secrets (.dev.vars locally, "wrangler secret put" when deployed): VAPID_PRIVATE_JWK, TE_API_KEY (TotalEnergies locator key).
 }
